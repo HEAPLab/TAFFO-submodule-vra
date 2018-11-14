@@ -23,6 +23,8 @@ Range<num_t> handleMul(const Range<num_t> op1, const Range<num_t> op2);
 template<typename num_t>
 Range<num_t> handleDiv(const Range<num_t> op1, const Range<num_t> op2);
 
+template<typename num_t>
+Range<num_t> handleRem(const Range<num_t> op1, const Range<num_t> op2);
 
 
 // template<typename num_t, unsigned OpCode>

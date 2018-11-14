@@ -2,6 +2,8 @@ add_llvm_loadable_module(TaffoVRA
   RangeOperations.cpp
   RangeOperations.hpp
   Range.hpp
+  ValueRangeAnalysis.cpp
+  ValueRangeAnalysis.hpp
   # TaffoInitializerPass.h
   # FixedPointType.cpp
   # FixedPointType.h
