@@ -11,18 +11,23 @@ namespace taffo {
 template<typename num_t>
 Range<num_t> handleInstruction(const Range<num_t> op1, const Range<num_t> op2, const unsigned OpCode);
 
+/** operator+ */
 template<typename num_t>
 Range<num_t> handleAdd(const Range<num_t> op1, const Range<num_t> op2);
 
+/** operator- */
 template<typename num_t>
 Range<num_t> handleSub(const Range<num_t> op1, const Range<num_t> op2);
 
+/** operator* */
 template<typename num_t>
 Range<num_t> handleMul(const Range<num_t> op1, const Range<num_t> op2);
 
+/** operator/ */
 template<typename num_t>
 Range<num_t> handleDiv(const Range<num_t> op1, const Range<num_t> op2);
 
+/** operator% */
 template<typename num_t>
 Range<num_t> handleRem(const Range<num_t> op1, const Range<num_t> op2);
 

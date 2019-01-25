@@ -1,6 +1,8 @@
 #ifndef TAFFO_VRA_RANGE_HPP
 #define TAFFO_VRA_RANGE_HPP
 
+#include <limits>
+
 namespace taffo {
 
 template<
@@ -11,6 +13,8 @@ struct Range
 {
 public:
 	Range(const num_t min, const num_t max) : _min(min), _max(max) {}
+	Range() : _min(std::numeric_limits<num_t>::lowest()), _max(std::numeric_limits<num_t>::max()) {}
+	Range(const Range& rhs) : _min(rhs.min()), _max(rhs.max()) {}
 
 private:
 	num_t _min, _max;

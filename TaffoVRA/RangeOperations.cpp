@@ -37,6 +37,7 @@ Range<num_t> handleInstruction(const Range<num_t> op1, const Range<num_t> op2, c
 	return nullptr;
 }
 
+/** operator+ */
 template<typename num_t>
 Range<num_t> handleAdd(const Range<num_t> op1, const Range<num_t> op2)
 {
@@ -45,6 +46,7 @@ Range<num_t> handleAdd(const Range<num_t> op1, const Range<num_t> op2)
 	return Range<num_t>(a,b);
 }
 
+/** operator- */
 template<typename num_t>
 Range<num_t> handleSub(const Range<num_t> op1, const Range<num_t> op2)
 {
@@ -53,6 +55,7 @@ Range<num_t> handleSub(const Range<num_t> op1, const Range<num_t> op2)
 	return Range<num_t>(a,b);
 }
 
+/** operator* */
 template<typename num_t>
 Range<num_t> handleMul(const Range<num_t> op1, const Range<num_t> op2)
 {
@@ -65,6 +68,7 @@ Range<num_t> handleMul(const Range<num_t> op1, const Range<num_t> op2)
 	return Range<num_t>(r1,r2);
 }
 
+/** operator/ */
 template<typename num_t>
 Range<num_t> handleDiv(const Range<num_t> op1, const Range<num_t> op2)
 {
@@ -77,6 +81,7 @@ Range<num_t> handleDiv(const Range<num_t> op1, const Range<num_t> op2)
 	return Range<num_t>(r1,r2);
 }
 
+/** operator% */
 template<typename num_t>
 Range<num_t> handleRem(const Range<num_t> op1, const Range<num_t> op2)
 {
