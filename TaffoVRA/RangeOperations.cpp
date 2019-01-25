@@ -4,8 +4,11 @@
 
 using namespace taffo;
 
+/** Handle binary instructions */
 template<typename num_t>
-Range<num_t> handleInstruction(const Range<num_t> op1, const Range<num_t> op2, const unsigned OpCode)
+Range<num_t> handleBinaryInstruction(const Range<num_t> op1,
+                                     const Range<num_t> op2,
+                                     const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::Add:
@@ -30,6 +33,19 @@ Range<num_t> handleInstruction(const Range<num_t> op1, const Range<num_t> op2, c
 		case llvm::Instruction::FRem:
 			return handleRem(op1,op2);
 			break;
+		default:
+			assert(false); // unsupported operation
+			break;
+	}
+	return nullptr;
+}
+
+template<typename num_t>
+Range<num_t> handleUnaryInstruction(const Range<num_t> op,
+                                    const unsigned OpCode)
+{
+	switch (OpCode) {
+		// TODO implement
 		default:
 			assert(false); // unsupported operation
 			break;

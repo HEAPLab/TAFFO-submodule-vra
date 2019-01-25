@@ -8,8 +8,16 @@
 
 namespace taffo {
 
+/** Handle binary instructions */
 template<typename num_t>
-Range<num_t> handleInstruction(const Range<num_t> op1, const Range<num_t> op2, const unsigned OpCode);
+Range<num_t> handleBinaryInstruction(const Range<num_t> op1,
+                                     const Range<num_t> op2,
+                                     const unsigned OpCode);
+
+/** Handle binary instructions */
+template<typename num_t>
+Range<num_t> handleUnaryInstruction(const Range<num_t> op,
+                                    const unsigned OpCode);
 
 /** operator+ */
 template<typename num_t>

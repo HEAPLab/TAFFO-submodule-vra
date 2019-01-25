@@ -36,8 +36,8 @@ private:
 
 	// data structures
 private:
-	llvm::DenseMap<llvm::Value*, Range<double> > user_input;
-	llvm::DenseMap<llvm::Value*, Range<double> > derived_ranges;
+	llvm::DenseMap<const llvm::Value*, Range<double> > user_input;
+	llvm::DenseMap<const llvm::Value*, Range<double> > derived_ranges;
 };
 
 }
