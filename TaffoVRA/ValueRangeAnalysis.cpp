@@ -131,12 +131,16 @@ void ValueRangeAnalysis::processModule(Module &M)
 					} else if (Instruction::isBinaryOp(opCode)) {
 						const llvm::Value* op1 = i.getOperand(0);
 						const llvm::Value* op2 = i.getOperand(1);
-
-						// TODO get both operands' ranges and update them
+						const auto info1 = fetchInfo(op1);
+						const auto info2 = fetchInfo(op2);
+						const auto res = handleBinaryInstruction(info1, info2, opCode);
+						saveValueInfo(&i, res);
 
 					} else if (Instruction::isUnaryOp(opCode)) {
 						const llvm::Value* op1 = i.getOperand(0);
-						// TODO get operator range update it
+						const auto info1 = fetchInfo(op1);
+						const auto res = handleBinaryInstruction(info1, info2, opCode);
+						saveValueInfo(&i, res);
 
 					} else {
 						// TODO here be dragons
@@ -156,5 +160,35 @@ void ValueRangeAnalysis::processModule(Module &M)
 //-----------------------------------------------------------------------------
 void ValueRangeAnalysis::saveResults()
 {
+	return;
+}
+
+//-----------------------------------------------------------------------------
+// RETRIEVE INFO
+//-----------------------------------------------------------------------------
+const Range<double> ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
+{
+	if (const auto it = user_input.find(v) != user_input.end()) {
+		return it->second;
+	}
+	if (const auto it = derived_ranges.find(v) != derived_ranges.end()) {
+		return it->second;
+	}
+	// no info available
+	return Range<double>();
+}
+
+//-----------------------------------------------------------------------------
+// SAVE VALUE INFO
+//-----------------------------------------------------------------------------
+void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const Range<double>& info)
+{
+	if (const auto it = user_input.find(v) != user_input.end()) {
+		;// TODO maybe check if more/less accurate
+	}
+	if (const auto it = derived_ranges.find(v) != derived_ranges.end()) {
+		;// TODO maybe check if more/less accurate
+	}
+	derived_ranges[v] = info;
 	return;
 }

@@ -34,6 +34,10 @@ private:
 
 	void saveResults();
 
+	const Range<double> fetchInfo(const llvm::Value* v) const;
+
+	void saveValueInfo(const llvm::Value* v, const Range<double>& info);
+
 	// data structures
 private:
 	llvm::DenseMap<const llvm::Value*, Range<double> > user_input;
