@@ -53,6 +53,18 @@ Range<num_t> handleUnaryInstruction(const Range<num_t> op,
 	return nullptr;
 }
 
+template<typename num_t>
+Range<num_t> handleCastInstruction(const Range<num_t> op,
+                                   const unsigned OpCode)
+{
+  switch (OpCode) {
+		// TODO implement
+		default:
+			assert(false); // unsupported operation
+			break;
+	}
+}
+
 /** operator+ */
 template<typename num_t>
 Range<num_t> handleAdd(const Range<num_t> op1, const Range<num_t> op2)

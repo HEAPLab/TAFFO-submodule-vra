@@ -14,10 +14,15 @@ Range<num_t> handleBinaryInstruction(const Range<num_t> op1,
                                      const Range<num_t> op2,
                                      const unsigned OpCode);
 
-/** Handle binary instructions */
+/** Handle unary instructions */
 template<typename num_t>
 Range<num_t> handleUnaryInstruction(const Range<num_t> op,
                                     const unsigned OpCode);
+
+/** Handle cast instructions */
+template<typename num_t>
+Range<num_t> handleCastInstruction(const Range<num_t> op,
+                                   const unsigned OpCode);
 
 /** operator+ */
 template<typename num_t>
