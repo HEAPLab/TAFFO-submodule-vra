@@ -33,6 +33,34 @@ Range<num_t> handleBinaryInstruction(const Range<num_t> op1,
 		case llvm::Instruction::FRem:
 			return handleRem(op1,op2);
 			break;
+		case llvm::Instruction::Shl: // TODO implement
+		case llvm::Instruction::LShr: // TODO implement
+		case llvm::Instruction::AShr: // TODO implement
+		case llvm::Instruction::And: // TODO implement
+		case llvm::Instruction::Or: // TODO implement
+		case llvm::Instruction::Xor: // TODO implement
+			break;
+		default:
+			assert(false); // unsupported operation
+			break;
+	}
+	return nullptr;
+}
+
+/** Memory instructions */
+template<typename num_t>
+Range<num_t> handleMemoryInstruction(const Range<num_t> op,
+                                     const unsigned OpCode)
+{
+	switch (OpCode) {
+		case llvm::Instruction::Alloca:
+		case llvm::Instruction::Load:
+		case llvm::Instruction::Store:
+		case llvm::Instruction::GetElementPtr:
+		case llvm::Instruction::Fence:
+		case llvm::Instruction::AtomicCmpXchg:
+		case llvm::Instruction::AtomicRMW:
+			break; // TODO implement
 		default:
 			assert(false); // unsupported operation
 			break;
@@ -45,7 +73,9 @@ Range<num_t> handleUnaryInstruction(const Range<num_t> op,
                                     const unsigned OpCode)
 {
 	switch (OpCode) {
-		// TODO implement
+		case llvm::Instruction::Fneg:
+			// TODO implement
+			break;
 		default:
 			assert(false); // unsupported operation
 			break;
@@ -53,17 +83,73 @@ Range<num_t> handleUnaryInstruction(const Range<num_t> op,
 	return nullptr;
 }
 
+/** Cast instructions */
 template<typename num_t>
 Range<num_t> handleCastInstruction(const Range<num_t> op,
                                    const unsigned OpCode)
 {
   switch (OpCode) {
-		// TODO implement
+		case llvm::Instruction::Trunc: // TODO implement
+			break;
+		case llvm::Instruction::ZExt:
+		case llvm::Instruction::SExt:
+			return copyRange(op);
+			break;
+		case llvm::Instruction::FPToUI:
+			return handleCastToUI(op);
+			break;
+		case llvm::Instruction::FPToSI:
+			return handleCastToSI(op);
+			break;
+		case llvm::Instruction::UIToFP:
+		case llvm::Instruction::SIToFP:
+			return copyRange(op);
+			break;
+		case llvm::Instruction::FPTrunc: // TODO implement
+		case llvm::Instruction::FPExt: // TODO implement
+			break;
+		case llvm::Instruction::PtrToInt:
+		case llvm::Instruction::IntToPtr:
+			return handleCastToSI(op);
+			break;
+		case llvm::Instruction::Bitcast: // TODO implement
+		case llvm::Instruction::AddrSpaceCast: // TODO implement
+			break;
 		default:
 			assert(false); // unsupported operation
 			break;
 	}
 }
+
+/** Other instructions */
+template<typename num_t>
+Range<num_t> handleOtherInstructions(const std::vector<Range<num_t> > &op,
+                                     const unsigned OpCode)
+{
+	switch (OpCode) {
+		case llvm::Instruction::ICmp: // TODO implement
+		case llvm::Instruction::FCmp: // TODO implement
+		case llvm::Instruction::PHI: // TODO implement
+		case llvm::Instruction::Call: // TODO implement
+		case llvm::Instruction::Select: // TODO implement
+		case llvm::Instruction::UserOp1: // TODO implement
+		case llvm::Instruction::UserOp2: // TODO implement
+		case llvm::Instruction::VAArg: // TODO implement
+		case llvm::Instruction::ExtractElement: // TODO implement
+		case llvm::Instruction::InsertElement: // TODO implement
+		case llvm::Instruction::ShuffleVector: // TODO implement
+		case llvm::Instruction::ExtractValue: // TODO implement
+		case llvm::Instruction::InserValue: // TODO implement
+		case llvm::Instruction::LandingPad: // TODO implement
+			break;
+		default:
+			assert(false); // unsupported operation
+			break;
+	}
+	return nullptr;
+}
+
+
 
 /** operator+ */
 template<typename num_t>
@@ -121,10 +207,27 @@ Range<num_t> handleRem(const Range<num_t> op1, const Range<num_t> op2)
 	return Range<num_t>(r1,r2);
 }
 
-/*
-template<typename num_t, unsigned OpCode>
-Range<num_t> handleInstruction(const Range<num_t> op);
+/** CastToUInteger */
+template<typename num_t>
+Range<num_t> handleCastToUI(const Range<num_t> op)
+{
+	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(op.min));
+	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(op.max));
+	return Range<num_t>(r1,r2);
+}
 
-template<typename num_t, unsigned OpCode>
-Range<num_t> handleInstruction(const std::list<Range<num_t> > op_list);
-*/
+/** CastToUInteger */
+template<typename num_t>
+Range<num_t> handleCastToSI(const Range<num_t> op)
+{
+	const num_t r1 = static_cast<num_t>(static_cast<long>(op.min));
+	const num_t r2 = static_cast<num_t>(static_cast<long>(op.max));
+	return Range<num_t>(r1,r2);
+}
+
+/** deep copy of range */
+template<typename num_t>
+Range<num_t> copyRange(const Range<num_t> op)
+{
+	return op;
+}
