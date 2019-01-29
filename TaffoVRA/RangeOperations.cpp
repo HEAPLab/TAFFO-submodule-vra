@@ -6,8 +6,8 @@ using namespace taffo;
 
 /** Handle binary instructions */
 template<typename num_t>
-Range<num_t> handleBinaryInstruction(const Range<num_t> op1,
-                                     const Range<num_t> op2,
+Range<num_t> handleBinaryInstruction(const Range<num_t> &op1,
+                                     const Range<num_t> &op2,
                                      const unsigned OpCode)
 {
 	switch (OpCode) {
@@ -49,7 +49,7 @@ Range<num_t> handleBinaryInstruction(const Range<num_t> op1,
 
 /** Memory instructions */
 template<typename num_t>
-Range<num_t> handleMemoryInstruction(const Range<num_t> op,
+Range<num_t> handleMemoryInstruction(const Range<num_t> &op,
                                      const unsigned OpCode)
 {
 	switch (OpCode) {
@@ -69,7 +69,7 @@ Range<num_t> handleMemoryInstruction(const Range<num_t> op,
 }
 
 template<typename num_t>
-Range<num_t> handleUnaryInstruction(const Range<num_t> op,
+Range<num_t> handleUnaryInstruction(const Range<num_t> &op,
                                     const unsigned OpCode)
 {
 	switch (OpCode) {
@@ -85,7 +85,7 @@ Range<num_t> handleUnaryInstruction(const Range<num_t> op,
 
 /** Cast instructions */
 template<typename num_t>
-Range<num_t> handleCastInstruction(const Range<num_t> op,
+Range<num_t> handleCastInstruction(const Range<num_t> &op,
                                    const unsigned OpCode)
 {
   switch (OpCode) {
@@ -153,7 +153,7 @@ Range<num_t> handleOtherInstructions(const std::vector<Range<num_t> > &op,
 
 /** operator+ */
 template<typename num_t>
-Range<num_t> handleAdd(const Range<num_t> op1, const Range<num_t> op2)
+Range<num_t> handleAdd(const Range<num_t> &op1, const Range<num_t> &op2)
 {
 	num_t a = op1.min() + op2.min();
 	num_t b = op1.max() + op2.max();
@@ -162,7 +162,7 @@ Range<num_t> handleAdd(const Range<num_t> op1, const Range<num_t> op2)
 
 /** operator- */
 template<typename num_t>
-Range<num_t> handleSub(const Range<num_t> op1, const Range<num_t> op2)
+Range<num_t> handleSub(const Range<num_t> &op1, const Range<num_t> &op2)
 {
 	num_t a = op1.min() - op2.max();
 	num_t b = op1.max() - op2.min();
@@ -171,7 +171,7 @@ Range<num_t> handleSub(const Range<num_t> op1, const Range<num_t> op2)
 
 /** operator* */
 template<typename num_t>
-Range<num_t> handleMul(const Range<num_t> op1, const Range<num_t> op2)
+Range<num_t> handleMul(const Range<num_t> &op1, const Range<num_t> &op2)
 {
 	num_t a = op1.min() * op2.min();
 	num_t b = op1.max() * op2.max();
@@ -184,7 +184,7 @@ Range<num_t> handleMul(const Range<num_t> op1, const Range<num_t> op2)
 
 /** operator/ */
 template<typename num_t>
-Range<num_t> handleDiv(const Range<num_t> op1, const Range<num_t> op2)
+Range<num_t> handleDiv(const Range<num_t> &op1, const Range<num_t> &op2)
 {
 	num_t a = op1.min() / op2.min();
 	num_t b = op1.max() / op2.max();
@@ -197,7 +197,7 @@ Range<num_t> handleDiv(const Range<num_t> op1, const Range<num_t> op2)
 
 /** operator% */
 template<typename num_t>
-Range<num_t> handleRem(const Range<num_t> op1, const Range<num_t> op2)
+Range<num_t> handleRem(const Range<num_t> &op1, const Range<num_t> &op2)
 {
 	const bool alwaysNeg = op1.max() <= 0;
 	const bool alwaysPos = op1.min() >= 0;
@@ -209,7 +209,7 @@ Range<num_t> handleRem(const Range<num_t> op1, const Range<num_t> op2)
 
 /** CastToUInteger */
 template<typename num_t>
-Range<num_t> handleCastToUI(const Range<num_t> op)
+Range<num_t> handleCastToUI(const Range<num_t> &op)
 {
 	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(op.min));
 	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(op.max));
@@ -218,7 +218,7 @@ Range<num_t> handleCastToUI(const Range<num_t> op)
 
 /** CastToUInteger */
 template<typename num_t>
-Range<num_t> handleCastToSI(const Range<num_t> op)
+Range<num_t> handleCastToSI(const Range<num_t> &op)
 {
 	const num_t r1 = static_cast<num_t>(static_cast<long>(op.min));
 	const num_t r2 = static_cast<num_t>(static_cast<long>(op.max));
@@ -269,7 +269,7 @@ Range<num_t> handleBooleanOr(const Range<num_t> &op1, const Range<num_t> &op2)
 
 /** deep copy of range */
 template<typename num_t>
-Range<num_t> copyRange(const Range<num_t> op)
+Range<num_t> copyRange(const Range<num_t> &op)
 {
 	return op;
 }
