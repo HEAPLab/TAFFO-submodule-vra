@@ -225,9 +225,75 @@ Range<num_t> handleCastToSI(const Range<num_t> op)
 	return Range<num_t>(r1,r2);
 }
 
+/** boolean Xor instruction */
+template<typename num_t>
+Range<num_t> handleBooleanXor(const Range<num_t> &op1, const Range<num_t> &op2)
+{
+	if (!op1.cross() && !op2.cross()) {
+		return getAlwaysFalse();
+	}
+	if (op1.isConstant() && op2.isConstant()) {
+		return getAlwaysFalse();
+	}
+	return getGenericBoolRange();
+	return op;
+}
+
+/** boolean And instruction */
+template<typename num_t>
+Range<num_t> handleBooleanAnd(const Range<num_t> &op1, const Range<num_t> &op2)
+{
+	if (!op1.cross() && !op2.cross()) {
+		return getAlwaysTrue();
+	}
+	if (op1.isConstant() && op2.isConstant()) {
+		return getAlwaysFalse();
+	}
+	return getGenericBoolRange();
+	return op;
+}
+
+/** boolean Or instruction */
+template<typename num_t>
+Range<num_t> handleBooleanOr(const Range<num_t> &op1, const Range<num_t> &op2)
+{
+	if (!op1.cross() || !op2.cross()) {
+		return getAlwaysTrue();
+	}
+	if (op1.isConstant() && op2.isConstant()) {
+		return getAlwaysFalse();
+	}
+	return getGenericBoolRange();
+	return op;
+}
+
 /** deep copy of range */
 template<typename num_t>
 Range<num_t> copyRange(const Range<num_t> op)
 {
 	return op;
+}
+
+/** create a generic boolean range */
+template<typename num_t>
+Range<num_t> getGenericBoolRange()
+{
+	Range<num_t> res(static_cast<num_t>(0), static_cast<num_t>(1));
+	return res;
+}
+
+/** create a always false boolean range */
+template<typename num_t>
+Range<num_t> getAlwaysFalse()
+{
+	Range<num_t> res(static_cast<num_t>(0), static_cast<num_t>(0));
+	return res;
+}
+
+/** create a always false boolean range */
+template<typename num_t>
+Range<num_t> getAlwaysTrue()
+{
+	Range<num_t> res(static_cast<num_t>(1), static_cast<num_t>(1));
+	return res;
 }

@@ -56,20 +56,33 @@ Range<num_t> handleCastToUI(const Range<num_t> op);
 template<typename num_t>
 Range<num_t> handleCastToSI(const Range<num_t> op);
 
+/** boolean Xor instruction */
+template<typename num_t>
+Range<num_t> handleBooleanXor(const Range<num_t> &op1, const Range<num_t> &op2);
+
+/** boolean And instruction */
+template<typename num_t>
+Range<num_t> handleBooleanAnd(const Range<num_t> &op1, const Range<num_t> &op2);
+
+/** boolean Or instruction */
+template<typename num_t>
+Range<num_t> handleBooleanOr(const Range<num_t> &op1, const Range<num_t> &op2);
+
 /** deep copy of range */
 template<typename num_t>
 Range<num_t> copyRange(const Range<num_t> op);
 
-// default delete
+/** create a generic boolean range */
+template<typename num_t>
+Range<num_t> getGenericBoolRange();
 
-// template<typename num_t>
-// Range<num_t> handleInstruction(const Range<num_t> op) = delete;
-//
-// template<typename num_t>
-// Range<num_t> handleInstruction(const Range<num_t> op1, const Range<num_t> op2) = delete;
-//
-// template<typename num_t>
-// Range<num_t> handleInstruction(const std::list<Range<num_t> > op_list) = delete;
+/** create a always false boolean range */
+template<typename num_t>
+Range<num_t> getAlwaysFalse();
+
+/** create a always false boolean range */
+template<typename num_t>
+Range<num_t> getAlwaysTrue();
 
 }
 

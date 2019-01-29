@@ -22,6 +22,10 @@ private:
 public:
 	inline const num_t min() {return _min;}
 	inline const num_t max() {return _max;}
+	inline const bool isConstant() const {return min() == max();}
+	inline const bool cross(const num_t val = 0.0) const {
+		return min() <= val && max() >= val;
+	}
 };
 
 }
