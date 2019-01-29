@@ -52,14 +52,6 @@ void ValueRangeAnalysis::harvestMetadata(const Module &M)
 {
 	MetadataManager &MDManager = MetadataManager::getMetadataManager();
 
-	// const auto harvest = [&]() {
-	// 	InputInfo *II = MDManager.retrieveInputInfo(v);
-	// 	if (II != nullptr && II->IType != nullptr) {
-	// 		user_input[&v] = Range<double>(II->IType->getMinValueBound(), II->IType->getMaxValueBound());
-	// 	}
-	// 	return;
-	// };
-
 	// TODO find a better ID than pointer to llvm::Value. Value name?
 
 	for (const auto &v : M.globals()) {
@@ -122,11 +114,17 @@ void ValueRangeAnalysis::processModule(Module &M)
 			for (const auto &bb : f.getBasicBlockList()) {
 				for (const auto &i : bb.getInstList()) {
 					const unsigned opCode = i.getOpcode();
-					if (Instruction::isTerminator(opCode))
+					if (opCode == Instruction::Call)
+					{
+						// TODO handle special case
+					} else if (Instruction::isTerminator(opCode))
 					{
 						// TODO handle special case
 					} else if (Instruction::isCast(opCode)) {
-						// TODO implement
+						const llvm::Value* op = i.getOperand(0);
+						const auto info = fetchInfo(op);
+						const auto res = handleCastInstruction(info, opCode);
+						saveValueInfo(&i, res);
 
 					} else if (Instruction::isBinaryOp(opCode)) {
 						const llvm::Value* op1 = i.getOperand(0);
