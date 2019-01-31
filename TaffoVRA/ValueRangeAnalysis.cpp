@@ -1,5 +1,6 @@
 #include "ValueRangeAnalysis.hpp"
 #include "InputInfo.h"
+#include "RangeOperations.hpp"
 #include "Metadata.h"
 
 #include "llvm/IR/Dominators.h"
@@ -30,7 +31,7 @@ bool ValueRangeAnalysis::runOnModule(Module &M)
 
 	processModule(M);
 
-	saveResults();
+	saveResults(M);
 
 	return true;
 }
@@ -57,24 +58,25 @@ void ValueRangeAnalysis::harvestMetadata(const Module &M)
 	for (const auto &v : M.globals()) {
 		// retrieve info about global var v, if any
 		InputInfo *II = MDManager.retrieveInputInfo(v);
-		if (II != nullptr && II->IType != nullptr) {
+		if (II != nullptr && II->IRange != nullptr) {
 			const llvm::Value* v_ptr = &v;
-			user_input[v_ptr] = Range<double>(II->IType->getMinValueBound(), II->IType->getMaxValueBound());
+			user_input[v_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 		}
 	}
-
-	// TODO check for function declarations M.ifuncs()
 
 	for (const auto &f : M.functions()) {
 		// retrieve info about function parameters
 		SmallVector<mdutils::InputInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
 		auto arg = f.arg_begin();
+		fun_arg_input[&f] = std::vector<range_ptr_t>();
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
-			if (*itII != nullptr && (*itII)->IType != nullptr) {
-				if (FPType *fpInfo  = dyn_cast<FPType>((*itII)->IType)) {
-					parseMetaData(variables, fpInfo, arg);
-				}
+			if (*itII != nullptr && (*itII)->IRange != nullptr) {
+				fun_arg_input[&f].push_back(make_range((*itII)->IRange->Min,
+				                                      (*itII)->IRange->Max));
+			} else {
+				// TODO change placeholder
+				fun_arg_input[&f].push_back(make_range());
 			}
 			arg++;
 		}
@@ -84,10 +86,10 @@ void ValueRangeAnalysis::harvestMetadata(const Module &M)
 			for (const auto &i : bb.getInstList()) {
 				// fetch info about Instruction i, if any
 				InputInfo *II = MDManager.retrieveInputInfo(i);
-				if (II != nullptr && II->IType != nullptr) {
+				if (II != nullptr && II->IRange != nullptr) {
 					const llvm::Value* i_ptr = &i;
-					user_input[i_ptr] = Range<double>(II->IType->getMinValueBound(),
-					                                  II->IType->getMaxValueBound());
+					user_input[i_ptr] = make_range(II->IRange->Min,
+					                               II->IRange->Max);
 				}
 			}
 		}
@@ -105,12 +107,16 @@ void ValueRangeAnalysis::processModule(Module &M)
 {
 	// TODO try to implement symbolic execution of loops
 
+	// TODO first create processing queue, then evaluate them
+
 	// iterate over functions till something is changed or up to MAX_IT iterations
 	const size_t MAX_IT = 3;
 	size_t count_iterations = 0;
 	bool changed = false;
 	do {
 		for (const auto &f : M.functions()) {
+			// TODO get function entry point: getEntryBlock
+			// TODO fetch Loop info
 			for (const auto &bb : f.getBasicBlockList()) {
 				for (const auto &i : bb.getInstList()) {
 					const unsigned opCode = i.getOpcode();
@@ -134,11 +140,13 @@ void ValueRangeAnalysis::processModule(Module &M)
 						const auto res = handleBinaryInstruction(info1, info2, opCode);
 						saveValueInfo(&i, res);
 
+#if LLVM_VERSION > 7
 					} else if (Instruction::isUnaryOp(opCode)) {
 						const llvm::Value* op1 = i.getOperand(0);
 						const auto info1 = fetchInfo(op1);
 						const auto res = handleBinaryInstruction(info1, info2, opCode);
 						saveValueInfo(&i, res);
+#endif
 
 					} else {
 						// TODO here be dragons
@@ -156,30 +164,79 @@ void ValueRangeAnalysis::processModule(Module &M)
 //-----------------------------------------------------------------------------
 // FINALIZATION
 //-----------------------------------------------------------------------------
-void ValueRangeAnalysis::saveResults()
+void ValueRangeAnalysis::saveResults(const llvm::Module &M)
 {
+	MetadataManager &MDManager = MetadataManager::getMetadataManager();
+	for (const auto &v : M.globals()) {
+		// retrieve info about global var v, if any
+		InputInfo *II = MDManager.retrieveInputInfo(v);
+		if (II != nullptr) {
+			const llvm::Value* v_ptr = &v;
+			const auto range = fetchInfo(v_ptr);
+			if (range != nullptr) {
+				II->IRange = new Range(range->min(), range->max());
+			} else {
+				// TODO set default
+			}
+		}
+	} // end globals
+
+	for (const auto &f : M.functions()) {
+		// // retrieve info about function parameters
+		// SmallVector<mdutils::InputInfo*, 5> argsII;
+		// MDManager.retrieveArgumentInputInfo(f, argsII);
+		// auto arg = f.arg_begin();
+		// for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
+		// 	if (*itII != nullptr && (*itII)->IRange != nullptr) {
+		// 		if (FPType *fpInfo  = dyn_cast<FPType>((*itII)->IRange)) {
+		// 			parseMetaData(variables, fpInfo, arg);
+		// 		}
+		// 	}
+		// 	arg++;
+		// }
+
+		// retrieve info about instructions, for each basic block bb
+		for (const auto &bb : f.getBasicBlockList()) {
+			for (const auto &i : bb.getInstList()) {
+				// fetch info about Instruction i, if any
+				InputInfo *II = MDManager.retrieveInputInfo(i);
+				if (II != nullptr) {
+					const llvm::Value* v_ptr = &i;
+					const auto range = fetchInfo(v_ptr);
+					if (range != nullptr) {
+						II->IRange = new Range(range->min(), range->max());
+					} else {
+						// TODO set default
+					}
+				}
+			} // end inst list
+		} // end bb
+	} // end function
 	return;
 }
 
 //-----------------------------------------------------------------------------
 // RETRIEVE INFO
 //-----------------------------------------------------------------------------
-const Range<double> ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
+const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 {
-	if (const auto it = user_input.find(v) != user_input.end()) {
+	using iter_t = decltype(user_input)::const_iterator;
+	iter_t it = user_input.find(v);
+	if (it != user_input.end()) {
 		return it->second;
 	}
-	if (const auto it = derived_ranges.find(v) != derived_ranges.end()) {
+	it = derived_ranges.find(v);
+	if (it != derived_ranges.end()) {
 		return it->second;
 	}
 	// no info available
-	return Range<double>();
+	return nullptr;
 }
 
 //-----------------------------------------------------------------------------
 // SAVE VALUE INFO
 //-----------------------------------------------------------------------------
-void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const Range<double>& info)
+void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const range_ptr_t& info)
 {
 	if (const auto it = user_input.find(v) != user_input.end()) {
 		;// TODO maybe check if more/less accurate

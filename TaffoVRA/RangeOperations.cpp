@@ -5,10 +5,9 @@
 using namespace taffo;
 
 /** Handle binary instructions */
-template<typename num_t>
-Range<num_t> handleBinaryInstruction(const Range<num_t> &op1,
-                                     const Range<num_t> &op2,
-                                     const unsigned OpCode)
+range_ptr_t handleBinaryInstruction(const range_ptr_t &op1,
+                                    const range_ptr_t &op2,
+                                    const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::Add:
@@ -48,8 +47,7 @@ Range<num_t> handleBinaryInstruction(const Range<num_t> &op1,
 }
 
 /** Memory instructions */
-template<typename num_t>
-Range<num_t> handleMemoryInstruction(const Range<num_t> &op,
+range_ptr_t handleMemoryInstruction(const range_ptr_t &op,
                                      const unsigned OpCode)
 {
 	switch (OpCode) {
@@ -68,12 +66,12 @@ Range<num_t> handleMemoryInstruction(const Range<num_t> &op,
 	return nullptr;
 }
 
-template<typename num_t>
-Range<num_t> handleUnaryInstruction(const Range<num_t> &op,
+#if LLVM_VERSION > 7
+range_ptr_t handleUnaryInstruction(const range_ptr_t &op,
                                     const unsigned OpCode)
 {
 	switch (OpCode) {
-		case llvm::Instruction::Fneg:
+		case llvm::Instruction::FNeg:
 			// TODO implement
 			break;
 		default:
@@ -82,11 +80,11 @@ Range<num_t> handleUnaryInstruction(const Range<num_t> &op,
 	}
 	return nullptr;
 }
+#endif
 
 /** Cast instructions */
-template<typename num_t>
-Range<num_t> handleCastInstruction(const Range<num_t> &op,
-                                   const unsigned OpCode)
+range_ptr_t handleCastInstruction(const range_ptr_t &op,
+                                  const unsigned OpCode)
 {
   switch (OpCode) {
 		case llvm::Instruction::Trunc: // TODO implement
@@ -112,18 +110,18 @@ Range<num_t> handleCastInstruction(const Range<num_t> &op,
 		case llvm::Instruction::IntToPtr:
 			return handleCastToSI(op);
 			break;
-		case llvm::Instruction::Bitcast: // TODO implement
+		case llvm::Instruction::BitCast: // TODO implement
 		case llvm::Instruction::AddrSpaceCast: // TODO implement
 			break;
 		default:
 			assert(false); // unsupported operation
 			break;
 	}
+	return nullptr;
 }
 
 /** Other instructions */
-template<typename num_t>
-Range<num_t> handleOtherInstructions(const std::vector<Range<num_t> > &op,
+range_ptr_t handleOtherInstructions(const std::vector<range_ptr_t > &op,
                                      const unsigned OpCode)
 {
 	switch (OpCode) {
@@ -139,7 +137,7 @@ Range<num_t> handleOtherInstructions(const std::vector<Range<num_t> > &op,
 		case llvm::Instruction::InsertElement: // TODO implement
 		case llvm::Instruction::ShuffleVector: // TODO implement
 		case llvm::Instruction::ExtractValue: // TODO implement
-		case llvm::Instruction::InserValue: // TODO implement
+		case llvm::Instruction::InsertValue: // TODO implement
 		case llvm::Instruction::LandingPad: // TODO implement
 			break;
 		default:
@@ -152,148 +150,132 @@ Range<num_t> handleOtherInstructions(const std::vector<Range<num_t> > &op,
 
 
 /** operator+ */
-template<typename num_t>
-Range<num_t> handleAdd(const Range<num_t> &op1, const Range<num_t> &op2)
+range_ptr_t handleAdd(const range_ptr_t &op1, const range_ptr_t &op2)
 {
-	num_t a = op1.min() + op2.min();
-	num_t b = op1.max() + op2.max();
-	return Range<num_t>(a,b);
+	num_t a = op1->min() + op2->min();
+	num_t b = op1->max() + op2->max();
+	return make_range(a,b);
 }
 
 /** operator- */
-template<typename num_t>
-Range<num_t> handleSub(const Range<num_t> &op1, const Range<num_t> &op2)
+range_ptr_t handleSub(const range_ptr_t &op1, const range_ptr_t &op2)
 {
-	num_t a = op1.min() - op2.max();
-	num_t b = op1.max() - op2.min();
-	return Range<num_t>(a,b);
+	num_t a = op1->min() - op2->max();
+	num_t b = op1->max() - op2->min();
+	return make_range(a,b);
 }
 
 /** operator* */
-template<typename num_t>
-Range<num_t> handleMul(const Range<num_t> &op1, const Range<num_t> &op2)
+range_ptr_t handleMul(const range_ptr_t &op1, const range_ptr_t &op2)
 {
-	num_t a = op1.min() * op2.min();
-	num_t b = op1.max() * op2.max();
-	num_t c = op1.min() * op2.max();
-	num_t d = op1.max() * op2.min();
+	num_t a = op1->min() * op2->min();
+	num_t b = op1->max() * op2->max();
+	num_t c = op1->min() * op2->max();
+	num_t d = op1->max() * op2->min();
 	const num_t r1 = std::min({a,b,c,d});
 	const num_t r2 = std::max({a,b,c,d});
-	return Range<num_t>(r1,r2);
+	return make_range(r1,r2);
 }
 
 /** operator/ */
-template<typename num_t>
-Range<num_t> handleDiv(const Range<num_t> &op1, const Range<num_t> &op2)
+range_ptr_t handleDiv(const range_ptr_t &op1, const range_ptr_t &op2)
 {
-	num_t a = op1.min() / op2.min();
-	num_t b = op1.max() / op2.max();
-	num_t c = op1.min() / op2.max();
-	num_t d = op1.max() / op2.min();
+	num_t a = op1->min() / op2->min();
+	num_t b = op1->max() / op2->max();
+	num_t c = op1->min() / op2->max();
+	num_t d = op1->max() / op2->min();
 	const num_t r1 = std::min({a,b,c,d});
 	const num_t r2 = std::max({a,b,c,d});
-	return Range<num_t>(r1,r2);
+	return make_range(r1,r2);
 }
 
 /** operator% */
-template<typename num_t>
-Range<num_t> handleRem(const Range<num_t> &op1, const Range<num_t> &op2)
+range_ptr_t handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
 {
-	const bool alwaysNeg = op1.max() <= 0;
-	const bool alwaysPos = op1.min() >= 0;
-	const num_t bound = fabs(op2.max()) - std::numeric_limits<num_t>::epsilon();
+	const bool alwaysNeg = op1->max() <= 0;
+	const bool alwaysPos = op1->min() >= 0;
+	const num_t bound = fabs(op2->max()) - std::numeric_limits<num_t>::epsilon();
 	const num_t r1 = (alwaysNeg) ? - bound : (alwaysPos) ? 0 : -bound;
 	const num_t r2 = (alwaysNeg) ? 0 : (alwaysPos) ? bound : bound;
-	return Range<num_t>(r1,r2);
+	return make_range(r1,r2);
 }
 
 /** CastToUInteger */
-template<typename num_t>
-Range<num_t> handleCastToUI(const Range<num_t> &op)
+range_ptr_t handleCastToUI(const range_ptr_t &op)
 {
-	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(op.min));
-	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(op.max));
-	return Range<num_t>(r1,r2);
+	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(op->min()));
+	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(op->max()));
+	return make_range(r1,r2);
 }
 
 /** CastToUInteger */
-template<typename num_t>
-Range<num_t> handleCastToSI(const Range<num_t> &op)
+range_ptr_t handleCastToSI(const range_ptr_t &op)
 {
-	const num_t r1 = static_cast<num_t>(static_cast<long>(op.min));
-	const num_t r2 = static_cast<num_t>(static_cast<long>(op.max));
-	return Range<num_t>(r1,r2);
+	const num_t r1 = static_cast<num_t>(static_cast<long>(op->min()));
+	const num_t r2 = static_cast<num_t>(static_cast<long>(op->max()));
+	return make_range(r1,r2);
 }
 
 /** boolean Xor instruction */
-template<typename num_t>
-Range<num_t> handleBooleanXor(const Range<num_t> &op1, const Range<num_t> &op2)
+range_ptr_t handleBooleanXor(const range_ptr_t &op1, const range_ptr_t &op2)
 {
-	if (!op1.cross() && !op2.cross()) {
+	if (!op1->cross() && !op2->cross()) {
 		return getAlwaysFalse();
 	}
-	if (op1.isConstant() && op2.isConstant()) {
+	if (op1->isConstant() && op2->isConstant()) {
 		return getAlwaysFalse();
 	}
 	return getGenericBoolRange();
-	return op;
 }
 
 /** boolean And instruction */
-template<typename num_t>
-Range<num_t> handleBooleanAnd(const Range<num_t> &op1, const Range<num_t> &op2)
+range_ptr_t handleBooleanAnd(const range_ptr_t &op1, const range_ptr_t &op2)
 {
-	if (!op1.cross() && !op2.cross()) {
+	if (!op1->cross() && !op2->cross()) {
 		return getAlwaysTrue();
 	}
-	if (op1.isConstant() && op2.isConstant()) {
+	if (op1->isConstant() && op2->isConstant()) {
 		return getAlwaysFalse();
 	}
 	return getGenericBoolRange();
-	return op;
 }
 
 /** boolean Or instruction */
-template<typename num_t>
-Range<num_t> handleBooleanOr(const Range<num_t> &op1, const Range<num_t> &op2)
+range_ptr_t handleBooleanOr(const range_ptr_t &op1, const range_ptr_t &op2)
 {
-	if (!op1.cross() || !op2.cross()) {
+	if (!op1->cross() || !op2->cross()) {
 		return getAlwaysTrue();
 	}
-	if (op1.isConstant() && op2.isConstant()) {
+	if (op1->isConstant() && op2->isConstant()) {
 		return getAlwaysFalse();
 	}
 	return getGenericBoolRange();
-	return op;
 }
 
 /** deep copy of range */
-template<typename num_t>
-Range<num_t> copyRange(const Range<num_t> &op)
+range_ptr_t copyRange(const range_ptr_t &op)
 {
-	return op;
+	range_ptr_t res = make_range(op->min(), op->max());
+	return res;
 }
 
 /** create a generic boolean range */
-template<typename num_t>
-Range<num_t> getGenericBoolRange()
+range_ptr_t getGenericBoolRange()
 {
-	Range<num_t> res(static_cast<num_t>(0), static_cast<num_t>(1));
+	range_ptr_t res = make_range(static_cast<num_t>(0), static_cast<num_t>(1));
 	return res;
 }
 
 /** create a always false boolean range */
-template<typename num_t>
-Range<num_t> getAlwaysFalse()
+range_ptr_t getAlwaysFalse()
 {
-	Range<num_t> res(static_cast<num_t>(0), static_cast<num_t>(0));
+	range_ptr_t res = make_range(static_cast<num_t>(0), static_cast<num_t>(0));
 	return res;
 }
 
 /** create a always false boolean range */
-template<typename num_t>
-Range<num_t> getAlwaysTrue()
+range_ptr_t getAlwaysTrue()
 {
-	Range<num_t> res(static_cast<num_t>(1), static_cast<num_t>(1));
+	range_ptr_t res = make_range(static_cast<num_t>(1), static_cast<num_t>(1));
 	return res;
 }

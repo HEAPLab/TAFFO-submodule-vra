@@ -32,16 +32,18 @@ private:
 
 	void processModule(llvm::Module &M);
 
-	void saveResults();
+	void saveResults(const llvm::Module &M);
 
-	const Range<double> fetchInfo(const llvm::Value* v) const;
+	const range_ptr_t fetchInfo(const llvm::Value* v) const;
 
-	void saveValueInfo(const llvm::Value* v, const Range<double>& info);
+	void saveValueInfo(const llvm::Value* v, const range_ptr_t& info);
 
 	// data structures
 private:
-	llvm::DenseMap<const llvm::Value*, Range<double> > user_input;
-	llvm::DenseMap<const llvm::Value*, Range<double> > derived_ranges;
+	llvm::DenseMap<const llvm::Value*, range_ptr_t> user_input;
+	llvm::DenseMap<const llvm::Value*, range_ptr_t> derived_ranges;
+	llvm::DenseMap<const llvm::Function*, std::vector<range_ptr_t> > fun_arg_input;
+	llvm::DenseMap<const llvm::Function*, std::vector<range_ptr_t> > fun_arg_derived;
 };
 
 }
