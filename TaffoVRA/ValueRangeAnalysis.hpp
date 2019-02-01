@@ -41,6 +41,9 @@ private:
 
 	// data structures
 private:
+	const unsigned bb_base_priority = 1;
+
+	// TODO find a better ID than pointer to llvm::Value. Value name?
 	llvm::DenseMap<const llvm::Value*, range_ptr_t> user_input;
 	llvm::DenseMap<const llvm::Value*, range_ptr_t> derived_ranges;
 	llvm::DenseMap<const llvm::Function*, std::vector<range_ptr_t> > fun_arg_input;

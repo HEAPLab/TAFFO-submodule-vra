@@ -9,6 +9,8 @@
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/MemorySSA.h"
 
+#include <set>
+
 using namespace llvm;
 using namespace taffo;
 using namespace mdutils;
@@ -50,10 +52,7 @@ void ValueRangeAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
 //-----------------------------------------------------------------------------
 void ValueRangeAnalysis::harvestMetadata(Module &M)
 {
-	const unsigned bb_base_priority = 1;
 	MetadataManager &MDManager = MetadataManager::getMetadataManager();
-
-	// TODO find a better ID than pointer to llvm::Value. Value name?
 
 	for (const auto &v : M.globals()) {
 		// retrieve info about global var v, if any
@@ -111,9 +110,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 			}
 		}
 
-		// TODO fetch info about loops for each function f
-	}
-
+	} // end iteration over Function in Module
 	return;
 }
 
@@ -132,12 +129,19 @@ void ValueRangeAnalysis::processModule(Module &M)
 	bool changed = false;
 	do {
 		for (const auto &f : M.functions()) {
-			// TODO get function entry point: getEntryBlock
-			// TODO fetch Loop info
-
-
+			// get function entry point: getEntryBlock
+			std::set<const llvm::BasicBlock*> bb_set;
+			std::set<const llvm::BasicBlock*> bb_unvisited_set;
 			for (const auto &bb : f.getBasicBlockList()) {
-				for (const auto &i : bb.getInstList()) {
+				const llvm::BasicBlock* bb_ptr = &bb;
+				bb_set.insert(bb_ptr);
+				bb_unvisited_set.insert(bb_ptr);
+			}
+			const llvm::BasicBlock* current_bb = &f.getEntryBlock();
+			bool isExitBlock = false;
+			while(!isExitBlock && !bb_unvisited_set.empty())
+			{
+				for (const auto &i : current_bb->getInstList()) {
 					const unsigned opCode = i.getOpcode();
 					if (opCode == Instruction::Call)
 					{
@@ -176,7 +180,9 @@ void ValueRangeAnalysis::processModule(Module &M)
 						// TODO here be dragons
 					}
 				}
-			}
+				// TODO update current_bb
+				// TODO check isExitBlock
+			} // end iteration over bb
 		}
 
 		count_iterations++;
@@ -262,12 +268,12 @@ const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 //-----------------------------------------------------------------------------
 void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const range_ptr_t& info)
 {
-	if (const auto it = user_input.find(v) != user_input.end()) {
-		;// TODO maybe check if more/less accurate
-	}
-	if (const auto it = derived_ranges.find(v) != derived_ranges.end()) {
-		;// TODO maybe check if more/less accurate
-	}
+	// if (const auto it = user_input.find(v) != user_input.end()) {
+	// 	// TODO maybe check if more/less accurate
+	// }
+	// if (const auto it = derived_ranges.find(v) != derived_ranges.end()) {
+	// 	// TODO maybe check if more/less accurate
+	// }
 	derived_ranges[v] = info;
 	return;
 }
