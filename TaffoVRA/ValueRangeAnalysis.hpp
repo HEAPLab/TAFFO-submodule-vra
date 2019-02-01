@@ -4,6 +4,7 @@
 #include "llvm/Pass.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
@@ -28,7 +29,7 @@ public:
 
 	// methods
 private:
-	void harvestMetadata(const llvm::Module &M);
+	void harvestMetadata(llvm::Module &M);
 
 	void processModule(llvm::Module &M);
 
@@ -44,6 +45,9 @@ private:
 	llvm::DenseMap<const llvm::Value*, range_ptr_t> derived_ranges;
 	llvm::DenseMap<const llvm::Function*, std::vector<range_ptr_t> > fun_arg_input;
 	llvm::DenseMap<const llvm::Function*, std::vector<range_ptr_t> > fun_arg_derived;
+	llvm::DenseMap<const llvm::Loop*, unsigned> user_loop_iterations;
+	llvm::DenseMap<const llvm::Loop*, unsigned> derived_loop_iterations;
+	llvm::DenseMap<const llvm::BasicBlock*, unsigned> bb_priority;
 };
 
 }

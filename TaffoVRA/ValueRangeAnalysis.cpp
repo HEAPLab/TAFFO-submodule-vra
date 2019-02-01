@@ -4,7 +4,6 @@
 #include "Metadata.h"
 
 #include "llvm/IR/Dominators.h"
-#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
@@ -49,8 +48,9 @@ void ValueRangeAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
 //-----------------------------------------------------------------------------
 // PREPROCESSING
 //-----------------------------------------------------------------------------
-void ValueRangeAnalysis::harvestMetadata(const Module &M)
+void ValueRangeAnalysis::harvestMetadata(Module &M)
 {
+	const unsigned bb_base_priority = 1;
 	MetadataManager &MDManager = MetadataManager::getMetadataManager();
 
 	// TODO find a better ID than pointer to llvm::Value. Value name?
@@ -64,7 +64,25 @@ void ValueRangeAnalysis::harvestMetadata(const Module &M)
 		}
 	}
 
-	for (const auto &f : M.functions()) {
+	for (llvm::Function &f : M.functions()) {
+		// retrieve info about loop iterations
+		LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(f).getLoopInfo();
+		for (auto &loop : LI.getLoopsInPreorder()) {
+			Optional<unsigned> lic = MetadataManager::retrieveLoopUnrollCount(*loop, &LI);
+			if (lic.hasValue()) {
+				user_loop_iterations[loop] = lic.getValue();
+				for (auto& bb : loop->getBlocks()) {
+					const auto it = bb_priority.find(bb);
+					if (it != bb_priority.end()) {
+						bb_priority[bb] += bb_base_priority * lic.getValue();
+					} else {
+						bb_priority[bb] = bb_base_priority * lic.getValue();
+					}
+				}
+
+			}
+		}
+
 		// retrieve info about function parameters
 		SmallVector<mdutils::InputInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
@@ -75,8 +93,7 @@ void ValueRangeAnalysis::harvestMetadata(const Module &M)
 				fun_arg_input[&f].push_back(make_range((*itII)->IRange->Min,
 				                                      (*itII)->IRange->Max));
 			} else {
-				// TODO change placeholder
-				fun_arg_input[&f].push_back(make_range());
+				fun_arg_input[&f].push_back(nullptr);
 			}
 			arg++;
 		}
@@ -117,38 +134,45 @@ void ValueRangeAnalysis::processModule(Module &M)
 		for (const auto &f : M.functions()) {
 			// TODO get function entry point: getEntryBlock
 			// TODO fetch Loop info
+
+
 			for (const auto &bb : f.getBasicBlockList()) {
 				for (const auto &i : bb.getInstList()) {
 					const unsigned opCode = i.getOpcode();
 					if (opCode == Instruction::Call)
 					{
 						// TODO handle special case
-					} else if (Instruction::isTerminator(opCode))
+					}
+					else if (Instruction::isTerminator(opCode))
 					{
 						// TODO handle special case
-					} else if (Instruction::isCast(opCode)) {
+					}
+					else if (Instruction::isCast(opCode))
+					{
 						const llvm::Value* op = i.getOperand(0);
 						const auto info = fetchInfo(op);
 						const auto res = handleCastInstruction(info, opCode);
 						saveValueInfo(&i, res);
-
-					} else if (Instruction::isBinaryOp(opCode)) {
+					}
+					else if (Instruction::isBinaryOp(opCode))
+					{
 						const llvm::Value* op1 = i.getOperand(0);
 						const llvm::Value* op2 = i.getOperand(1);
 						const auto info1 = fetchInfo(op1);
 						const auto info2 = fetchInfo(op2);
 						const auto res = handleBinaryInstruction(info1, info2, opCode);
 						saveValueInfo(&i, res);
-
+					}
 #if LLVM_VERSION > 7
-					} else if (Instruction::isUnaryOp(opCode)) {
+					else if (Instruction::isUnaryOp(opCode))
+					{
 						const llvm::Value* op1 = i.getOperand(0);
 						const auto info1 = fetchInfo(op1);
 						const auto res = handleBinaryInstruction(info1, info2, opCode);
 						saveValueInfo(&i, res);
+					}
 #endif
-
-					} else {
+					else {
 						// TODO here be dragons
 					}
 				}
