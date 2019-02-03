@@ -128,13 +128,14 @@ void ValueRangeAnalysis::processModule(Module &M)
 	size_t count_iterations = 0;
 	bool changed = false;
 	do {
+		// TODO break this loop: first create queue, then evaluate
 		for (const auto &f : M.functions()) {
 			// get function entry point: getEntryBlock
-			std::set<const llvm::BasicBlock*> bb_set;
+			std::set<const llvm::BasicBlock*> bb_queue;
 			std::set<const llvm::BasicBlock*> bb_unvisited_set;
 			for (const auto &bb : f.getBasicBlockList()) {
 				const llvm::BasicBlock* bb_ptr = &bb;
-				bb_set.insert(bb_ptr);
+				bb_queue.insert(bb_ptr);
 				bb_unvisited_set.insert(bb_ptr);
 			}
 			const llvm::BasicBlock* current_bb = &f.getEntryBlock();
@@ -180,10 +181,31 @@ void ValueRangeAnalysis::processModule(Module &M)
 						// TODO here be dragons
 					}
 				}
-				// TODO update current_bb
 				// TODO check isExitBlock
 			} // end iteration over bb
-		}
+
+			// update bb_queue by removing current bb and insert its successors
+			bb_queue.erase(current_bb);
+			bb_unvisited_set.erase(current_bb);
+
+			const llvm::BasicBlock* unique_successor = current_bb->getUniqueSuccessor();
+			if (unique_successor != nullptr) {
+				bb_queue.insert(unique_successor);
+			} else {
+				const auto successors = llvm::successors(current_bb);
+				for (auto successor : successors) {
+					const llvm::BasicBlock* succ = successor;
+					if (bb_priority[succ] > 0) {
+						bb_queue.insert(succ);
+						bb_priority[succ] -= bb_base_priority;
+					}
+				}
+			}
+
+			// update current_bb
+			current_bb = *bb_queue.begin();
+
+		} // end iteration over functions in bb
 
 		count_iterations++;
 	} while(changed && count_iterations < MAX_IT);
