@@ -2,3 +2,8 @@
 build
 
 \.idea/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+*.so
