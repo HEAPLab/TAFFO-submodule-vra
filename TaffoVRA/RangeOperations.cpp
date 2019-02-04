@@ -1,8 +1,15 @@
 #include "RangeOperations.hpp"
+#include "RangeOperationsCallWhitelist.hpp"
+
 #include <assert.h>
 #include <limits>
+#include <map>
 
 using namespace taffo;
+
+//-----------------------------------------------------------------------------
+// Wrappers
+//-----------------------------------------------------------------------------
 
 /** Handle binary instructions */
 range_ptr_t handleBinaryInstruction(const range_ptr_t &op1,
@@ -120,8 +127,37 @@ range_ptr_t handleCastInstruction(const range_ptr_t &op,
 	return nullptr;
 }
 
+using map_value_t = decltype(&handleCallToCeil);
+const std::map<const std::string, map_value_t> functionWhiteList =
+{
+	{"ceil",  &handleCallToCeil},
+	{"floor", &handleCallToFloor},
+	{"fabs",  &handleCallToFabs},
+	{"log",   &handleCallToLog},
+	{"log10", &handleCallToLog10},
+	{"log2f", &handleCallToLog2f},
+	{"sqrt",  &handleCallToSqrt},
+	{"exp",   &handleCallToExp},
+	{"sin",   &handleCallToSin},
+	{"cos",   &handleCallToCos},
+	{"acos",  &handleCallToAcos},
+	{"tanh",  &handleCallToTanh},
+};
+
+
+/** Handle call to known math functions. Return nullptr if unknown */
+range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
+                                      const std::string &function)
+{
+	const auto it = functionWhiteList.find(function);
+	if (it != functionWhiteList.end()) {
+		return it->second(ops);
+	}
+	return nullptr;
+}
+
 /** Other instructions */
-range_ptr_t handleOtherInstructions(const std::vector<range_ptr_t > &op,
+range_ptr_t handleOtherInstructions(const std::list<range_ptr_t > &op,
                                      const unsigned OpCode)
 {
 	switch (OpCode) {
@@ -148,6 +184,9 @@ range_ptr_t handleOtherInstructions(const std::vector<range_ptr_t > &op,
 }
 
 
+//-----------------------------------------------------------------------------
+// Arithmetic
+//-----------------------------------------------------------------------------
 
 /** operator+ */
 range_ptr_t handleAdd(const range_ptr_t &op1, const range_ptr_t &op2)

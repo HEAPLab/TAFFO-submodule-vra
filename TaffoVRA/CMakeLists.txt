@@ -1,4 +1,6 @@
 add_llvm_loadable_module(TaffoVRA
+  RangeOperationsCallWhitelist.cpp
+  RangeOperationsCallWhitelist.hpp
   RangeOperations.cpp
   RangeOperations.hpp
   Range.hpp
@@ -21,4 +23,4 @@ endif()
 set_property(TARGET TaffoVRA PROPERTY CXX_STANDARD 11)
 set_property(TARGET TaffoVRA PROPERTY CXX_STANDARD_REQUIRED ON)
 
-target_link_libraries(TaffoVRA MDUtils)
+target_link_libraries(TaffoVRA MDUtils m)
