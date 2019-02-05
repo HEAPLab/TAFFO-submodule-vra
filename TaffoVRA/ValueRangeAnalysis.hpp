@@ -12,6 +12,8 @@
 
 #include "Range.hpp"
 
+#include <set>
+
 #define DEBUG_TYPE "taffo-vra"
 #define DEBUG_VRA "ValueRangeAnalysis"
 
@@ -33,6 +35,10 @@ private:
 
 	void processModule(llvm::Module &M);
 
+	void processFunction(llvm::Function& F);
+
+	void processBasicBlock(llvm::BasicBlock& BB);
+
 	void saveResults(const llvm::Module &M);
 
 	const range_ptr_t fetchInfo(const llvm::Value* v) const;
@@ -51,6 +57,11 @@ private:
 	llvm::DenseMap<const llvm::Loop*, unsigned> user_loop_iterations;
 	llvm::DenseMap<const llvm::Loop*, unsigned> derived_loop_iterations;
 	llvm::DenseMap<const llvm::BasicBlock*, unsigned> bb_priority;
+
+	std::set<llvm::Function*> f_unvisited_set;
+
+	std::vector<llvm::Function*> call_stack;
+
 };
 
 }

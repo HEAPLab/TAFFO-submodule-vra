@@ -121,95 +121,143 @@ void ValueRangeAnalysis::processModule(Module &M)
 {
 	// TODO try to implement symbolic execution of loops
 
-	// TODO first create processing queue, then evaluate them
+	// first create processing queue, then evaluate them
+	for (auto f = M.begin(); f != M.end(); ++f) {
+		llvm::Function* f_ptr = &*f;
+		f_unvisited_set.insert(f_ptr);
+	}
 
-	// iterate over functions till something is changed or up to MAX_IT iterations
-	const size_t MAX_IT = 3;
-	size_t count_iterations = 0;
-	bool changed = false;
-	do {
-		// TODO break this loop: first create queue, then evaluate
-		for (const auto &f : M.functions()) {
-			// get function entry point: getEntryBlock
-			std::set<const llvm::BasicBlock*> bb_queue;
-			std::set<const llvm::BasicBlock*> bb_unvisited_set;
-			for (const auto &bb : f.getBasicBlockList()) {
-				const llvm::BasicBlock* bb_ptr = &bb;
-				bb_queue.insert(bb_ptr);
-				bb_unvisited_set.insert(bb_ptr);
-			}
-			const llvm::BasicBlock* current_bb = &f.getEntryBlock();
-			bool isExitBlock = false;
-			while(!isExitBlock && !bb_unvisited_set.empty())
-			{
-				for (const auto &i : current_bb->getInstList()) {
-					const unsigned opCode = i.getOpcode();
-					if (opCode == Instruction::Call)
-					{
-						// TODO handle special case
-					}
-					else if (Instruction::isTerminator(opCode))
-					{
-						// TODO handle special case
-					}
-					else if (Instruction::isCast(opCode))
-					{
-						const llvm::Value* op = i.getOperand(0);
-						const auto info = fetchInfo(op);
-						const auto res = handleCastInstruction(info, opCode);
-						saveValueInfo(&i, res);
-					}
-					else if (Instruction::isBinaryOp(opCode))
-					{
-						const llvm::Value* op1 = i.getOperand(0);
-						const llvm::Value* op2 = i.getOperand(1);
-						const auto info1 = fetchInfo(op1);
-						const auto info2 = fetchInfo(op2);
-						const auto res = handleBinaryInstruction(info1, info2, opCode);
-						saveValueInfo(&i, res);
-					}
-#if LLVM_VERSION > 7
-					else if (Instruction::isUnaryOp(opCode))
-					{
-						const llvm::Value* op1 = i.getOperand(0);
-						const auto info1 = fetchInfo(op1);
-						const auto res = handleBinaryInstruction(info1, info2, opCode);
-						saveValueInfo(&i, res);
-					}
-#endif
-					else {
-						// TODO here be dragons
-					}
+	// fetch initial function
+	llvm::Function* current_f = *f_unvisited_set.begin();
+
+	while (current_f != nullptr) {
+		processFunction(*current_f);
+		f_unvisited_set.erase(current_f);
+
+		// update current_f
+		current_f = (f_unvisited_set.empty()) ? nullptr : *f_unvisited_set.begin();
+	}
+
+
+	return;
+}
+
+void ValueRangeAnalysis::processFunction(llvm::Function& F)
+{
+	call_stack.push_back(&F);
+	// get function entry point: getEntryBlock
+	std::set<llvm::BasicBlock*> bb_queue;
+	std::set<llvm::BasicBlock*> bb_unvisited_set;
+	for (auto &bb : F.getBasicBlockList()) {
+		llvm::BasicBlock* bb_ptr = &bb;
+		// bb_queue.insert(bb_ptr);
+		bb_unvisited_set.insert(bb_ptr);
+	}
+	llvm::BasicBlock* current_bb = &F.getEntryBlock();
+
+	while(current_bb != nullptr)
+	{
+		processBasicBlock(*current_bb);
+
+		// update bb_queue by removing current bb and insert its successors
+		bb_queue.erase(current_bb);
+		bb_unvisited_set.erase(current_bb);
+
+		llvm::BasicBlock* unique_successor = current_bb->getUniqueSuccessor();
+		if (unique_successor != nullptr) {
+			bb_queue.insert(unique_successor);
+		} else {
+			auto successors = llvm::successors(current_bb);
+			for (auto successor : successors) {
+				llvm::BasicBlock* succ = successor;
+				if (bb_priority[succ] > 0) {
+					bb_queue.insert(succ);
+					bb_priority[succ] -= bb_base_priority;
 				}
-				// TODO check isExitBlock
-			} // end iteration over bb
+			}
+		}
 
-			// update bb_queue by removing current bb and insert its successors
-			bb_queue.erase(current_bb);
-			bb_unvisited_set.erase(current_bb);
-
-			const llvm::BasicBlock* unique_successor = current_bb->getUniqueSuccessor();
-			if (unique_successor != nullptr) {
-				bb_queue.insert(unique_successor);
+		if (bb_queue.empty()) {
+			if (bb_unvisited_set.empty()) {
+				bb_queue.insert(nullptr);
 			} else {
-				const auto successors = llvm::successors(current_bb);
-				for (auto successor : successors) {
-					const llvm::BasicBlock* succ = successor;
-					if (bb_priority[succ] > 0) {
-						bb_queue.insert(succ);
-						bb_priority[succ] -= bb_base_priority;
-					}
-				}
+				llvm::BasicBlock* bb_ptr = *bb_unvisited_set.begin();
+				bb_queue.insert(bb_ptr);
+			}
+		}
+
+		// update current_bb
+		current_bb = *bb_queue.begin();
+	} // end iteration over bb
+
+	call_stack.pop_back();
+	return;
+}
+
+void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
+{
+	for (auto &i : BB.getInstList()) {
+		const unsigned opCode = i.getOpcode();
+		if (opCode == Instruction::Call)
+		{
+			// TODO fetch function name
+			const std::string calledFunctionName = "";
+			llvm::CallInst* call_i = dyn_cast<llvm::CallInst>(&i);
+			if (!call_i) {
+				// TODO handle error
+				assert(false);
+			}
+			std::list<range_ptr_t> arg_ranges;
+			for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
+			{
+				const llvm::Value* arg = *arg_it;
+				const range_ptr_t arg_info = fetchInfo(arg);
+				arg_ranges.push_back(arg_info);
 			}
 
-			// update current_bb
-			current_bb = *bb_queue.begin();
+			// first check if it is among the whitelisted functions we can handle
+			range_ptr_t res = handleMathCallInstruction(arg_ranges, calledFunctionName);
 
-		} // end iteration over functions in bb
-
-		count_iterations++;
-	} while(changed && count_iterations < MAX_IT);
-
+			// if not a whitelisted then try to fetch it from Module
+			if (!res) {
+				// TODO check for recursion
+				// TODO call processFunction
+			}
+			saveValueInfo(&i, res);
+		}
+		else if (Instruction::isTerminator(opCode))
+		{
+			// TODO handle special case
+		}
+		else if (Instruction::isCast(opCode))
+		{
+			const llvm::Value* op = i.getOperand(0);
+			const auto info = fetchInfo(op);
+			const auto res = handleCastInstruction(info, opCode);
+			saveValueInfo(&i, res);
+		}
+		else if (Instruction::isBinaryOp(opCode))
+		{
+			const llvm::Value* op1 = i.getOperand(0);
+			const llvm::Value* op2 = i.getOperand(1);
+			const auto info1 = fetchInfo(op1);
+			const auto info2 = fetchInfo(op2);
+			const auto res = handleBinaryInstruction(info1, info2, opCode);
+			saveValueInfo(&i, res);
+		}
+#if LLVM_VERSION > 7
+		else if (Instruction::isUnaryOp(opCode))
+		{
+			const llvm::Value* op1 = i.getOperand(0);
+			const auto info1 = fetchInfo(op1);
+			const auto res = handleBinaryInstruction(info1, info2, opCode);
+			saveValueInfo(&i, res);
+		}
+#endif
+		else {
+			// TODO here be dragons
+		}
+	}
 	return;
 }
 
