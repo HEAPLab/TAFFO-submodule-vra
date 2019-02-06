@@ -64,6 +64,9 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 	}
 
 	for (llvm::Function &f : M.functions()) {
+		const std::string name = f.getName();
+		known_functions[name] = &f;
+
 		// retrieve info about loop iterations
 		LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(f).getLoopInfo();
 		for (auto &loop : LI.getLoopsInPreorder()) {
@@ -85,7 +88,6 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		// retrieve info about function parameters
 		SmallVector<mdutils::InputInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
-		auto arg = f.arg_begin();
 		fun_arg_input[&f] = std::vector<range_ptr_t>();
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
 			if (*itII != nullptr && (*itII)->IRange != nullptr) {
@@ -94,7 +96,6 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 			} else {
 				fun_arg_input[&f].push_back(nullptr);
 			}
-			arg++;
 		}
 
 		// retrieve info about instructions, for each basic block bb
@@ -144,6 +145,8 @@ void ValueRangeAnalysis::processModule(Module &M)
 
 void ValueRangeAnalysis::processFunction(llvm::Function& F)
 {
+	// TODO fetch info about actual parameters
+
 	call_stack.push_back(&F);
 	// get function entry point: getEntryBlock
 	std::set<llvm::BasicBlock*> bb_queue;
@@ -220,7 +223,11 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 
 			// if not a whitelisted then try to fetch it from Module
 			if (!res) {
+				// TODO fetch llvm::Function
 				// TODO check for recursion
+
+				// TODO update parameter metadata
+
 				// TODO call processFunction
 			}
 			saveValueInfo(&i, res);

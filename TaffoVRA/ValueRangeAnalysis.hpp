@@ -13,6 +13,7 @@
 #include "Range.hpp"
 
 #include <set>
+#include <map>
 
 #define DEBUG_TYPE "taffo-vra"
 #define DEBUG_VRA "ValueRangeAnalysis"
@@ -59,6 +60,7 @@ private:
 	llvm::DenseMap<const llvm::BasicBlock*, unsigned> bb_priority;
 
 	std::set<llvm::Function*> f_unvisited_set;
+	std::map<const std::string, llvm::Function*> known_functions;
 
 	std::vector<llvm::Function*> call_stack;
 
