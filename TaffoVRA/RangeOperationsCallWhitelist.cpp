@@ -8,7 +8,7 @@
 
 using namespace taffo;
 
-range_ptr_t handleCallToCeil(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToCeil(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function ceil");
 	range_ptr_t op = operands.front();
@@ -19,7 +19,7 @@ range_ptr_t handleCallToCeil(const std::list<range_ptr_t>& operands)
 	                  static_cast<num_t>(ceil(static_cast<double>(op->max()))));
 }
 
-range_ptr_t handleCallToFloor(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToFloor(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function floor");
 	range_ptr_t op = operands.front();
@@ -30,7 +30,7 @@ range_ptr_t handleCallToFloor(const std::list<range_ptr_t>& operands)
 	                  static_cast<num_t>(floor(static_cast<double>(op->max()))));
 }
 
-range_ptr_t handleCallToFabs(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToFabs(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function fabs");
 	range_ptr_t op = operands.front();
@@ -45,7 +45,7 @@ range_ptr_t handleCallToFabs(const std::list<range_ptr_t>& operands)
 	return make_range(max, min);
 }
 
-range_ptr_t handleCallToLog(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToLog(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function Log");
 	range_ptr_t op = operands.front();
@@ -59,7 +59,7 @@ range_ptr_t handleCallToLog(const std::list<range_ptr_t>& operands)
 	return make_range(min, max);
 }
 
-range_ptr_t handleCallToLog10(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToLog10(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function Log10");
 	range_ptr_t op = operands.front();
@@ -73,7 +73,7 @@ range_ptr_t handleCallToLog10(const std::list<range_ptr_t>& operands)
 	return make_range(min, max);
 }
 
-range_ptr_t handleCallToLog2f(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToLog2f(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function Log2f");
 	range_ptr_t op = operands.front();
@@ -87,7 +87,7 @@ range_ptr_t handleCallToLog2f(const std::list<range_ptr_t>& operands)
 	return make_range(min, max);
 }
 
-range_ptr_t handleCallToSqrt(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToSqrt(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function Sqrt");
 	range_ptr_t op = operands.front();
@@ -104,7 +104,7 @@ range_ptr_t handleCallToSqrt(const std::list<range_ptr_t>& operands)
 	return make_range(max, min);
 }
 
-range_ptr_t handleCallToExp(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToExp(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function Exp");
 	range_ptr_t op = operands.front();
@@ -116,26 +116,42 @@ range_ptr_t handleCallToExp(const std::list<range_ptr_t>& operands)
 	return make_range(min, max);
 }
 
-range_ptr_t handleCallToSin(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToSin(const std::list<range_ptr_t>& operands)
 {
 	// TODO implement
 	return nullptr;
 }
 
-range_ptr_t handleCallToCos(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToCos(const std::list<range_ptr_t>& operands)
 {
 	// TODO implement
 	return nullptr;
 }
 
-range_ptr_t handleCallToAcos(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToAcos(const std::list<range_ptr_t>& operands)
 {
 	// TODO implement
 	return nullptr;
 }
 
-range_ptr_t handleCallToTanh(const std::list<range_ptr_t>& operands)
+static range_ptr_t handleCallToTanh(const std::list<range_ptr_t>& operands)
 {
 	// TODO implement
 	return nullptr;
 }
+
+const std::map<const std::string, map_value_t> functionWhiteList =
+{
+	{"ceil",  &handleCallToCeil},
+	{"floor", &handleCallToFloor},
+	{"fabs",  &handleCallToFabs},
+	{"log",   &handleCallToLog},
+	{"log10", &handleCallToLog10},
+	{"log2f", &handleCallToLog2f},
+	{"sqrt",  &handleCallToSqrt},
+	{"exp",   &handleCallToExp},
+	{"sin",   &handleCallToSin},
+	{"cos",   &handleCallToCos},
+	{"acos",  &handleCallToAcos},
+	{"tanh",  &handleCallToTanh},
+};

@@ -127,24 +127,6 @@ range_ptr_t handleCastInstruction(const range_ptr_t &op,
 	return nullptr;
 }
 
-using map_value_t = decltype(&handleCallToCeil);
-const std::map<const std::string, map_value_t> functionWhiteList =
-{
-	{"ceil",  &handleCallToCeil},
-	{"floor", &handleCallToFloor},
-	{"fabs",  &handleCallToFabs},
-	{"log",   &handleCallToLog},
-	{"log10", &handleCallToLog10},
-	{"log2f", &handleCallToLog2f},
-	{"sqrt",  &handleCallToSqrt},
-	{"exp",   &handleCallToExp},
-	{"sin",   &handleCallToSin},
-	{"cos",   &handleCallToCos},
-	{"acos",  &handleCallToAcos},
-	{"tanh",  &handleCallToTanh},
-};
-
-
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
                                       const std::string &function)

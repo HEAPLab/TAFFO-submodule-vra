@@ -4,33 +4,12 @@
 #include "Range.hpp"
 
 #include <list>
+#include <map>
 
 namespace taffo {
 
-range_ptr_t handleCallToCeil(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToFloor(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToFabs(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToLog(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToLog10(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToLog2f(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToSqrt(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToExp(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToSin(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToCos(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToAcos(const std::list<range_ptr_t>& operands);
-
-range_ptr_t handleCallToTanh(const std::list<range_ptr_t>& operands);
-
+using map_value_t = range_ptr_t(*)(const std::list<range_ptr_t>&);
+const std::map<const std::string, map_value_t> functionWhiteList;
 };
 
 #endif /* end of include guard: TAFFO_RANGE_OPERATIONS_CALL_WHITELIST_HPP */

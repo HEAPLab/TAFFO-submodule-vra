@@ -6,10 +6,6 @@ add_llvm_loadable_module(TaffoVRA
   Range.hpp
   ValueRangeAnalysis.cpp
   ValueRangeAnalysis.hpp
-  # TaffoInitializerPass.h
-  # FixedPointType.cpp
-  # FixedPointType.h
-  # Annotations.cpp
 
   PLUGIN_TOOL
   opt
@@ -23,4 +19,4 @@ endif()
 set_property(TARGET TaffoVRA PROPERTY CXX_STANDARD 11)
 set_property(TARGET TaffoVRA PROPERTY CXX_STANDARD_REQUIRED ON)
 
-target_link_libraries(TaffoVRA MDUtils m)
+target_link_libraries(TaffoVRA MDUtils m stdc++)
