@@ -67,6 +67,10 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		const std::string name = f.getName();
 		known_functions[name] = &f;
 
+		// retrieve information about recursion count
+		unsigned recursion_count = MDManager.retrieveMaxRecursionCount(f);
+		fun_rec_count[&f] = recursion_count;
+
 		// retrieve info about loop iterations
 		LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(f).getLoopInfo();
 		for (auto &loop : LI.getLoopsInPreorder()) {
@@ -80,15 +84,14 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 					} else {
 						bb_priority[bb] = bb_base_priority * lic.getValue();
 					}
-				}
-
-			}
+				} // end iteration over bb in loop
+			} // if no value is available, try to infer it
 		}
 
 		// retrieve info about function parameters
 		SmallVector<mdutils::InputInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
-		fun_arg_input[&f] = std::vector<range_ptr_t>();
+		fun_arg_input[&f] = std::list<range_ptr_t>();
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
 			if (*itII != nullptr && (*itII)->IRange != nullptr) {
 				fun_arg_input[&f].push_back(make_range((*itII)->IRange->Min,
@@ -133,7 +136,7 @@ void ValueRangeAnalysis::processModule(Module &M)
 
 	while (current_f != nullptr) {
 		processFunction(*current_f);
-		f_unvisited_set.erase(current_f);
+		// f_unvisited_set update hasd been moved in processFunction
 
 		// update current_f
 		current_f = (f_unvisited_set.empty()) ? nullptr : *f_unvisited_set.begin();
@@ -145,9 +148,47 @@ void ValueRangeAnalysis::processModule(Module &M)
 
 void ValueRangeAnalysis::processFunction(llvm::Function& F)
 {
-	// TODO fetch info about actual parameters
+	// if already available, no need to execute again
+	auto it = return_values.find(&F);
+	if (it != return_values.end()) {
+		range_ptr_t tmp = it->second;
+		if (tmp != nullptr) {
+			return;
+		}
+	}
 
+	// fetch info about actual parameters
+	auto param_lookup_it = fun_arg_input.find(&F);
+	if (param_lookup_it == fun_arg_input.end()) {
+		param_lookup_it = fun_arg_derived.find(&F);
+		if (param_lookup_it != fun_arg_derived.end()) {
+			// save derived info
+			auto param_val_it = F.arg_begin();
+			auto param_info_it = param_lookup_it->second.begin();
+			while (param_val_it != F.arg_end()) {
+				llvm::Argument* arg_ptr = param_val_it;
+				llvm::Value* arg_val = dyn_cast<llvm::Value>(arg_ptr);
+				saveValueInfo(arg_val, *param_info_it);
+				param_info_it++;
+				param_val_it++;
+			}
+		}
+	} else {
+		// save input info
+		auto param_val_it = F.arg_begin();
+		auto param_info_it = param_lookup_it->second.begin();
+		while (param_val_it != F.arg_end()) {
+			llvm::Argument* arg_ptr = param_val_it;
+			llvm::Value* arg_val = dyn_cast<llvm::Value>(arg_ptr);
+			saveValueInfo(arg_val, *param_info_it);
+			param_info_it++;
+			param_val_it++;
+		}
+	}
+
+	// update stack for the simulation of execution
 	call_stack.push_back(&F);
+
 	// get function entry point: getEntryBlock
 	std::set<llvm::BasicBlock*> bb_queue;
 	std::set<llvm::BasicBlock*> bb_unvisited_set;
@@ -194,6 +235,8 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	} // end iteration over bb
 
 	call_stack.pop_back();
+	f_unvisited_set.erase(&F);
+	// TODO keep a range for possible return value
 	return;
 }
 
@@ -208,7 +251,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			llvm::CallInst* call_i = dyn_cast<llvm::CallInst>(&i);
 			if (!call_i) {
 				// TODO handle error
-				assert(false);
+				assert(false && "Cannot cast a call instruction to llvm::CallInst");
 			}
 			std::list<range_ptr_t> arg_ranges;
 			for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
@@ -223,12 +266,34 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 
 			// if not a whitelisted then try to fetch it from Module
 			if (!res) {
-				// TODO fetch llvm::Function
-				// TODO check for recursion
+				// fetch llvm::Function
+				auto function = known_functions.find(calledFunctionName);
+				if (function != known_functions.end()) {
+					// got the llvm::Function
+					llvm::Function* f = function->second;
 
-				// TODO update parameter metadata
-
-				// TODO call processFunction
+					// check for recursion
+					size_t call_count = 0;
+					for (size_t i = 0; i < call_stack.size(); i++) {
+						if (call_stack[i] == f) {
+							call_count++;
+						}
+					}
+					if (call_count <= fun_rec_count[f]) {
+						// Can process
+						// update parameter metadata
+						fun_arg_derived[f] = arg_ranges;
+						processFunction(*f);
+						// fetch function return value
+						auto res_it = return_values.find(f);
+						res = res_it->second;
+					} else {
+						// TODO handle exceeding recursion count case
+					}
+				} else {
+					// TODO handle case of external function call
+					// TODO handle case of llvm intrinsics function call
+				}
 			}
 			saveValueInfo(&i, res);
 		}
