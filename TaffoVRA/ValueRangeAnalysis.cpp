@@ -8,6 +8,7 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/MemorySSA.h"
+#include "llvm/Support/Debug.h"
 
 #include <set>
 
@@ -26,8 +27,6 @@ static RegisterPass<ValueRangeAnalysis> X(
 
 bool ValueRangeAnalysis::runOnModule(Module &M)
 {
-	// DEBUG_WITH_TYPE(DEBUG_VRA, printAnnotatedObj(m));
-
 	harvestMetadata(M);
 
 	processModule(M);
@@ -64,8 +63,15 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 	}
 
 	for (llvm::Function &f : M.functions()) {
+		if (f.empty()) {
+			continue;
+		}
 		const std::string name = f.getName();
 		known_functions[name] = &f;
+
+		// DEBUG(
+			dbgs() << "YO ZIO SONO IN FUNZIONE: "<< name << "\n";
+		// );
 
 		// retrieve information about recursion count
 		unsigned recursion_count = MDManager.retrieveMaxRecursionCount(f);
@@ -243,6 +249,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 {
 	for (auto &i : BB.getInstList()) {
+		i.dump();
 		const unsigned opCode = i.getOpcode();
 		if (opCode == Instruction::Call)
 		{

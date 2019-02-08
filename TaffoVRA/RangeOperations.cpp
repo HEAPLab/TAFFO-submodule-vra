@@ -12,9 +12,9 @@ using namespace taffo;
 //-----------------------------------------------------------------------------
 
 /** Handle binary instructions */
-range_ptr_t handleBinaryInstruction(const range_ptr_t &op1,
-                                    const range_ptr_t &op2,
-                                    const unsigned OpCode)
+range_ptr_t taffo::handleBinaryInstruction(const range_ptr_t &op1,
+                                           const range_ptr_t &op2,
+                                           const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::Add:
@@ -54,8 +54,8 @@ range_ptr_t handleBinaryInstruction(const range_ptr_t &op1,
 }
 
 /** Memory instructions */
-range_ptr_t handleMemoryInstruction(const range_ptr_t &op,
-                                     const unsigned OpCode)
+range_ptr_t taffo::handleMemoryInstruction(const range_ptr_t &op,
+                                           const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::Alloca:
@@ -74,8 +74,8 @@ range_ptr_t handleMemoryInstruction(const range_ptr_t &op,
 }
 
 #if LLVM_VERSION > 7
-range_ptr_t handleUnaryInstruction(const range_ptr_t &op,
-                                    const unsigned OpCode)
+range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
+                                          const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::FNeg:
@@ -90,8 +90,8 @@ range_ptr_t handleUnaryInstruction(const range_ptr_t &op,
 #endif
 
 /** Cast instructions */
-range_ptr_t handleCastInstruction(const range_ptr_t &op,
-                                  const unsigned OpCode)
+range_ptr_t taffo::handleCastInstruction(const range_ptr_t &op,
+                                         const unsigned OpCode)
 {
   switch (OpCode) {
 		case llvm::Instruction::Trunc: // TODO implement
@@ -128,8 +128,8 @@ range_ptr_t handleCastInstruction(const range_ptr_t &op,
 }
 
 /** Handle call to known math functions. Return nullptr if unknown */
-range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
-                                      const std::string &function)
+range_ptr_t taffo::handleMathCallInstruction(const std::list<range_ptr_t>& ops,
+                                             const std::string &function)
 {
 	const auto it = functionWhiteList.find(function);
 	if (it != functionWhiteList.end()) {
@@ -139,8 +139,8 @@ range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
 }
 
 /** Other instructions */
-range_ptr_t handleOtherInstructions(const std::list<range_ptr_t > &op,
-                                     const unsigned OpCode)
+range_ptr_t taffo::handleOtherInstructions(const std::list<range_ptr_t > &op,
+                                           const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::ICmp: // TODO implement
@@ -171,7 +171,7 @@ range_ptr_t handleOtherInstructions(const std::list<range_ptr_t > &op,
 //-----------------------------------------------------------------------------
 
 /** operator+ */
-range_ptr_t handleAdd(const range_ptr_t &op1, const range_ptr_t &op2)
+range_ptr_t taffo::handleAdd(const range_ptr_t &op1, const range_ptr_t &op2)
 {
 	num_t a = op1->min() + op2->min();
 	num_t b = op1->max() + op2->max();
@@ -179,7 +179,7 @@ range_ptr_t handleAdd(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** operator- */
-range_ptr_t handleSub(const range_ptr_t &op1, const range_ptr_t &op2)
+range_ptr_t taffo::handleSub(const range_ptr_t &op1, const range_ptr_t &op2)
 {
 	num_t a = op1->min() - op2->max();
 	num_t b = op1->max() - op2->min();
@@ -187,7 +187,7 @@ range_ptr_t handleSub(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** operator* */
-range_ptr_t handleMul(const range_ptr_t &op1, const range_ptr_t &op2)
+range_ptr_t taffo::handleMul(const range_ptr_t &op1, const range_ptr_t &op2)
 {
 	num_t a = op1->min() * op2->min();
 	num_t b = op1->max() * op2->max();
@@ -199,7 +199,7 @@ range_ptr_t handleMul(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** operator/ */
-range_ptr_t handleDiv(const range_ptr_t &op1, const range_ptr_t &op2)
+range_ptr_t taffo::handleDiv(const range_ptr_t &op1, const range_ptr_t &op2)
 {
 	num_t a = op1->min() / op2->min();
 	num_t b = op1->max() / op2->max();
@@ -211,7 +211,7 @@ range_ptr_t handleDiv(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** operator% */
-range_ptr_t handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
+range_ptr_t taffo::handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
 {
 	const bool alwaysNeg = op1->max() <= 0;
 	const bool alwaysPos = op1->min() >= 0;
@@ -222,7 +222,7 @@ range_ptr_t handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** CastToUInteger */
-range_ptr_t handleCastToUI(const range_ptr_t &op)
+range_ptr_t taffo::handleCastToUI(const range_ptr_t &op)
 {
 	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(op->min()));
 	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(op->max()));
@@ -230,7 +230,7 @@ range_ptr_t handleCastToUI(const range_ptr_t &op)
 }
 
 /** CastToUInteger */
-range_ptr_t handleCastToSI(const range_ptr_t &op)
+range_ptr_t taffo::handleCastToSI(const range_ptr_t &op)
 {
 	const num_t r1 = static_cast<num_t>(static_cast<long>(op->min()));
 	const num_t r2 = static_cast<num_t>(static_cast<long>(op->max()));
@@ -238,7 +238,8 @@ range_ptr_t handleCastToSI(const range_ptr_t &op)
 }
 
 /** boolean Xor instruction */
-range_ptr_t handleBooleanXor(const range_ptr_t &op1, const range_ptr_t &op2)
+range_ptr_t taffo::handleBooleanXor(const range_ptr_t &op1,
+                                    const range_ptr_t &op2)
 {
 	if (!op1->cross() && !op2->cross()) {
 		return getAlwaysFalse();
@@ -250,7 +251,8 @@ range_ptr_t handleBooleanXor(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** boolean And instruction */
-range_ptr_t handleBooleanAnd(const range_ptr_t &op1, const range_ptr_t &op2)
+range_ptr_t taffo::handleBooleanAnd(const range_ptr_t &op1,
+                                    const range_ptr_t &op2)
 {
 	if (!op1->cross() && !op2->cross()) {
 		return getAlwaysTrue();
@@ -262,7 +264,8 @@ range_ptr_t handleBooleanAnd(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** boolean Or instruction */
-range_ptr_t handleBooleanOr(const range_ptr_t &op1, const range_ptr_t &op2)
+range_ptr_t taffo::handleBooleanOr(const range_ptr_t &op1,
+                                   const range_ptr_t &op2)
 {
 	if (!op1->cross() || !op2->cross()) {
 		return getAlwaysTrue();
