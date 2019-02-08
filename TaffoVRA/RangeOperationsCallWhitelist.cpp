@@ -83,7 +83,7 @@ static range_ptr_t handleCallToLog2f(const std::list<range_ptr_t>& operands)
 	assert(op->max() >= 0);
 	num_t min = (op->min() < 0) ? std::numeric_limits<num_t>::epsilon() : op->min();
 	min = static_cast<num_t>(log2f(static_cast<double>(min)));
-	num_t max = static_cast<num_t>(log2f(static_cast<double>(max)));
+	num_t max = static_cast<num_t>(log2f(static_cast<double>(op->max())));
 	return make_range(min, max);
 }
 
