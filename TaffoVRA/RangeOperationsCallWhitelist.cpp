@@ -1,10 +1,10 @@
-#include "Range.hpp"
-#include "RangeOperationsCallWhitelist.hpp"
-
+#include <string>
 #include <list>
 #include <math.h>
 #include <cassert>
 #include <limits>
+#include "Range.hpp"
+#include "RangeOperationsCallWhitelist.hpp"
 
 using namespace taffo;
 
