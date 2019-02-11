@@ -49,6 +49,10 @@ void ValueRangeAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
 //-----------------------------------------------------------------------------
 // PREPROCESSING
 //-----------------------------------------------------------------------------
+bool isValidRange(Range *rng) {
+  return rng != nullptr && !std::isnan(rng->Min) && !std::isnan(rng->Max);
+}
+
 void ValueRangeAnalysis::harvestMetadata(Module &M)
 {
 	MetadataManager &MDManager = MetadataManager::getMetadataManager();
@@ -56,7 +60,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 	for (const auto &v : M.globals()) {
 		// retrieve info about global var v, if any
 		InputInfo *II = MDManager.retrieveInputInfo(v);
-		if (II != nullptr && II->IRange != nullptr) {
+		if (II != nullptr && isValidRange(II->IRange)) {
 			const llvm::Value* v_ptr = &v;
 			user_input[v_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 		}
@@ -68,10 +72,6 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		}
 		const std::string name = f.getName();
 		known_functions[name] = &f;
-
-		// DEBUG(
-			dbgs() << "YO ZIO SONO IN FUNZIONE: "<< name << "\n";
-		// );
 
 		// retrieve information about recursion count
 		unsigned recursion_count = MDManager.retrieveMaxRecursionCount(f);
@@ -99,7 +99,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		MDManager.retrieveArgumentInputInfo(f, argsII);
 		fun_arg_input[&f] = std::list<range_ptr_t>();
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
-			if (*itII != nullptr && (*itII)->IRange != nullptr) {
+			if (*itII != nullptr && isValidRange((*itII)->IRange)) {
 				fun_arg_input[&f].push_back(make_range((*itII)->IRange->Min,
 				                                      (*itII)->IRange->Max));
 			} else {
@@ -112,10 +112,9 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 			for (const auto &i : bb.getInstList()) {
 				// fetch info about Instruction i, if any
 				InputInfo *II = MDManager.retrieveInputInfo(i);
-				if (II != nullptr && II->IRange != nullptr) {
+				if (II != nullptr && isValidRange(II->IRange)) {
 					const llvm::Value* i_ptr = &i;
-					user_input[i_ptr] = make_range(II->IRange->Min,
-					                               II->IRange->Max);
+          user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 				}
 			}
 		}
@@ -251,7 +250,6 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 {
 	for (auto &i : BB.getInstList()) {
-		i.dump();
 		const unsigned opCode = i.getOpcode();
 		if (opCode == Instruction::Call)
 		{
