@@ -334,6 +334,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		}
 #endif
 		else {
+		  dbgs() << "[Warning] Instruction not supported :" << i << "\n";
 			// TODO here be dragons
 		}
 	}
@@ -343,47 +344,50 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 //-----------------------------------------------------------------------------
 // FINALIZATION
 //-----------------------------------------------------------------------------
-void ValueRangeAnalysis::saveResults(const llvm::Module &M)
+void ValueRangeAnalysis::saveResults(llvm::Module &M)
 {
 	MetadataManager &MDManager = MetadataManager::getMetadataManager();
-	for (const auto &v : M.globals()) {
+	for (auto &v : M.globals()) {
 		// retrieve info about global var v, if any
 		InputInfo *II = MDManager.retrieveInputInfo(v);
 		if (II != nullptr) {
-			const llvm::Value* v_ptr = &v;
-			const auto range = fetchInfo(v_ptr);
+			const auto range = fetchInfo(&v);
 			if (range != nullptr) {
 				II->IRange = new Range(range->min(), range->max());
+				MDManager.setInputInfoMetadata(v, *II);
 			} else {
 				// TODO set default
 			}
 		}
 	} // end globals
 
-	for (const auto &f : M.functions()) {
-		// // retrieve info about function parameters
-		// SmallVector<mdutils::InputInfo*, 5> argsII;
-		// MDManager.retrieveArgumentInputInfo(f, argsII);
-		// auto arg = f.arg_begin();
-		// for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
-		// 	if (*itII != nullptr && (*itII)->IRange != nullptr) {
-		// 		if (FPType *fpInfo  = dyn_cast<FPType>((*itII)->IRange)) {
-		// 			parseMetaData(variables, fpInfo, arg);
-		// 		}
-		// 	}
-		// 	arg++;
-		// }
+	for (auto &f : M.functions()) {
+
+	  // arg range
+    SmallVector<mdutils::InputInfo*, 5> argsII;
+    MDManager.retrieveArgumentInputInfo(f, argsII);
+    auto argsIt = argsII.begin();
+    for (Argument &arg : f.args()) {
+      const auto range = fetchInfo(&arg);
+      if (range != nullptr) {
+        (*argsIt)->IRange = new Range(range->min(), range->max());
+      } else {
+        // TODO set default
+      }
+      argsIt++;
+    }
+    MDManager.setArgumentInputInfoMetadata(f, argsII);
 
 		// retrieve info about instructions, for each basic block bb
-		for (const auto &bb : f.getBasicBlockList()) {
-			for (const auto &i : bb.getInstList()) {
+		for (auto &bb : f.getBasicBlockList()) {
+			for (auto &i : bb.getInstList()) {
 				// fetch info about Instruction i, if any
 				InputInfo *II = MDManager.retrieveInputInfo(i);
 				if (II != nullptr) {
-					const llvm::Value* v_ptr = &i;
-					const auto range = fetchInfo(v_ptr);
+					const auto range = fetchInfo(&i);
 					if (range != nullptr) {
 						II->IRange = new Range(range->min(), range->max());
+						MDManager.setInputInfoMetadata(i, *II);
 					} else {
 						// TODO set default
 					}

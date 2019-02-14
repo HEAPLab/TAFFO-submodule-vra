@@ -42,7 +42,7 @@ private:
 
 	void processBasicBlock(llvm::BasicBlock& BB);
 
-	void saveResults(const llvm::Module &M);
+	void saveResults(llvm::Module &M);
 
 	const range_ptr_t fetchInfo(const llvm::Value* v) const;
 
