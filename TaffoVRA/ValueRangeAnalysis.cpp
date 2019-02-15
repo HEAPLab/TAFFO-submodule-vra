@@ -253,13 +253,14 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		const unsigned opCode = i.getOpcode();
 		if (opCode == Instruction::Call)
 		{
-			// TODO fetch function name
-			const std::string calledFunctionName = "";
 			llvm::CallInst* call_i = dyn_cast<llvm::CallInst>(&i);
 			if (!call_i) {
 				emitError("Cannot cast a call instruction to llvm::CallInst");
 				assert(false && "Cannot cast a call instruction to llvm::CallInst");
 			}
+			// fetch function name
+			llvm::Function* callee = call_i->getCalledFunction();
+			const std::string calledFunctionName = callee->getName();
 			std::list<range_ptr_t> arg_ranges;
 			for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
 			{
