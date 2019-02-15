@@ -277,28 +277,28 @@ range_ptr_t taffo::handleBooleanOr(const range_ptr_t &op1,
 }
 
 /** deep copy of range */
-range_ptr_t copyRange(const range_ptr_t &op)
+range_ptr_t taffo::copyRange(const range_ptr_t &op)
 {
 	range_ptr_t res = make_range(op->min(), op->max());
 	return res;
 }
 
 /** create a generic boolean range */
-range_ptr_t getGenericBoolRange()
+range_ptr_t taffo::getGenericBoolRange()
 {
 	range_ptr_t res = make_range(static_cast<num_t>(0), static_cast<num_t>(1));
 	return res;
 }
 
 /** create a always false boolean range */
-range_ptr_t getAlwaysFalse()
+range_ptr_t taffo::getAlwaysFalse()
 {
 	range_ptr_t res = make_range(static_cast<num_t>(0), static_cast<num_t>(0));
 	return res;
 }
 
 /** create a always false boolean range */
-range_ptr_t getAlwaysTrue()
+range_ptr_t taffo::getAlwaysTrue()
 {
 	range_ptr_t res = make_range(static_cast<num_t>(1), static_cast<num_t>(1));
 	return res;
