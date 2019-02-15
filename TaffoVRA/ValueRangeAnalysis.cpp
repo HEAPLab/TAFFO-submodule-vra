@@ -363,20 +363,20 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 
 	for (auto &f : M.functions()) {
 
-	  // arg range
-    SmallVector<mdutils::InputInfo*, 5> argsII;
-    MDManager.retrieveArgumentInputInfo(f, argsII);
-    auto argsIt = argsII.begin();
-    for (Argument &arg : f.args()) {
-      const auto range = fetchInfo(&arg);
-      if (range != nullptr) {
-        (*argsIt)->IRange = new Range(range->min(), range->max());
-      } else {
-        // TODO set default
-      }
-      argsIt++;
-    }
-    MDManager.setArgumentInputInfoMetadata(f, argsII);
+		// arg range
+		SmallVector<mdutils::InputInfo*, 5> argsII;
+		MDManager.retrieveArgumentInputInfo(f, argsII);
+		auto argsIt = argsII.begin();
+		for (Argument &arg : f.args()) {
+			const auto range = fetchInfo(&arg);
+			if (range != nullptr) {
+				(*argsIt)->IRange = new Range(range->min(), range->max());
+			} else {
+				// TODO set default
+			}
+			argsIt++;
+		}
+		MDManager.setArgumentInputInfoMetadata(f, argsII);
 
 		// retrieve info about instructions, for each basic block bb
 		for (auto &bb : f.getBasicBlockList()) {
