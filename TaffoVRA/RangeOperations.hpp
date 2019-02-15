@@ -17,9 +17,6 @@ range_ptr_t handleBinaryInstruction(const range_ptr_t &op1,
                                     const range_ptr_t &op2,
                                     const unsigned OpCode);
 
-range_ptr_t handleMemoryInstruction(const range_ptr_t &op,
-                                    const unsigned OpCode);
-
 #if LLVM_VERSION > 7
 /** Handle unary instructions */
 range_ptr_t handleUnaryInstruction(const range_ptr_t &op,

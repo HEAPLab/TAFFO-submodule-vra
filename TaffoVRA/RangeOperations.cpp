@@ -53,33 +53,13 @@ range_ptr_t taffo::handleBinaryInstruction(const range_ptr_t &op1,
 	return nullptr;
 }
 
-/** Memory instructions */
-range_ptr_t taffo::handleMemoryInstruction(const range_ptr_t &op,
-                                           const unsigned OpCode)
-{
-	switch (OpCode) {
-		case llvm::Instruction::Alloca:
-		case llvm::Instruction::Load:
-		case llvm::Instruction::Store:
-		case llvm::Instruction::GetElementPtr:
-		case llvm::Instruction::Fence:
-		case llvm::Instruction::AtomicCmpXchg:
-		case llvm::Instruction::AtomicRMW:
-			break; // TODO implement
-		default:
-			assert(false); // unsupported operation
-			break;
-	}
-	return nullptr;
-}
-
 #if LLVM_VERSION > 7
 range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
                                           const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::FNeg:
-			// TODO implement
+			return make_range(-op->max(), -op->min());
 			break;
 		default:
 			assert(false); // unsupported operation

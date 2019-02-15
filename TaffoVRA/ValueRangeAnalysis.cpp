@@ -3,6 +3,7 @@
 #include "RangeOperations.hpp"
 #include "Metadata.h"
 
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -337,10 +338,30 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		}
 #endif
 		else {
-			const std::string message = "unknown instruction " + i.getOpcode();
-			emitError(message);
+			switch (opCode) {
+				// memory operations
+				case llvm::Instruction::Alloca:
+					// do nothing
+					break;
+				case llvm::Instruction::Load:
+					break; // TODO implement
+				case llvm::Instruction::Store:
+					handleStoreInstr(&i);
+					break;
+				case llvm::Instruction::GetElementPtr:
+					break; // TODO implement
+				case llvm::Instruction::Fence:
+					break; // TODO implement
+				case llvm::Instruction::AtomicCmpXchg:
+					break; // TODO implement
+				case llvm::Instruction::AtomicRMW:
+					break; // TODO implement
+				default:
+					emitError("unknown instruction " + opCode);
+					break;
+				}
 			// TODO here be dragons
-		}
+		} // end else
 	}
 	return;
 }
@@ -402,6 +423,45 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 	return;
 }
 
+
+//-----------------------------------------------------------------------------
+// HANDLE MEMORY OPERATIONS
+//-----------------------------------------------------------------------------
+void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
+{
+	const llvm::StoreInst* store_i = dyn_cast<llvm::StoreInst>(store);
+	if (!store_i) {
+		emitError("Could not convert store instruction to StoreInst");
+		return;
+	}
+	const llvm::Value* address_param = store_i->getPointerOperand();
+	const llvm::Value* value_param = store_i->getValueOperand();
+	const range_ptr_t range = fetchInfo(value_param);
+	// TODO check for possible alias
+	memory[address_param] = range;
+	return;
+}
+
+//-----------------------------------------------------------------------------
+// HANDLE MEMORY OPERATIONS
+//-----------------------------------------------------------------------------
+range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
+{
+	const llvm::LoadInst* load_i = dyn_cast<llvm::LoadInst>(load);
+	if (!load_i) {
+		emitError("Could not convert load instruction to LoadInst");
+		return nullptr;
+	}
+	const llvm::Value* address_param = load_i->getPointerOperand();
+	// TODO check for possible alias
+	using const_it = decltype(memory)::const_iterator;
+	const_it it = memory.find(address_param);
+	if (address_param) {
+		return it->second;
+	}
+	return nullptr;
+}
+
 //-----------------------------------------------------------------------------
 // RETRIEVE INFO
 //-----------------------------------------------------------------------------
@@ -415,6 +475,20 @@ const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 	it = derived_ranges.find(v);
 	if (it != derived_ranges.end()) {
 		return it->second;
+	}
+	const llvm::Constant* const_i = dyn_cast<llvm::Constant>(v);
+	if (const_i) {
+		const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(const_i);
+		if (int_i) {
+			return make_range(static_cast<num_t>(int_i->getSExtValue()),
+			                  static_cast<num_t>(int_i->getSExtValue()));
+		}
+		const llvm::ConstantFP* fp_i = dyn_cast<llvm::ConstantFP>(const_i);
+		if (fp_i) {
+			return make_range(static_cast<num_t>(fp_i->getValueAPF().convertToDouble()),
+			                  static_cast<num_t>(fp_i->getValueAPF().convertToDouble()));
+		}
+		// TODO derive range
 	}
 	// no info available
 	return nullptr;

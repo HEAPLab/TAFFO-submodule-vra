@@ -44,6 +44,10 @@ private:
 
 	void saveResults(llvm::Module &M);
 
+	void handleStoreInstr(const llvm::Instruction* store);
+
+	range_ptr_t handleLoadInstr(const llvm::Instruction* load);
+
 	const range_ptr_t fetchInfo(const llvm::Value* v) const;
 
 	void saveValueInfo(const llvm::Value* v, const range_ptr_t& info);
@@ -61,6 +65,7 @@ private:
 	llvm::DenseMap<const llvm::Value*, range_ptr_t> derived_ranges;
 	llvm::DenseMap<const llvm::Function*, std::list<range_ptr_t> > fun_arg_input;
 	llvm::DenseMap<const llvm::Function*, std::list<range_ptr_t> > fun_arg_derived;
+	llvm::DenseMap<const llvm::Value*, range_ptr_t> memory;
 	llvm::DenseMap<const llvm::Function*, unsigned> fun_rec_count;
 	llvm::DenseMap<const llvm::Loop*, unsigned> user_loop_iterations;
 	llvm::DenseMap<const llvm::Loop*, unsigned> derived_loop_iterations;
