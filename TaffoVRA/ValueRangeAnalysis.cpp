@@ -257,7 +257,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			const std::string calledFunctionName = "";
 			llvm::CallInst* call_i = dyn_cast<llvm::CallInst>(&i);
 			if (!call_i) {
-				// TODO handle error
+				emitError("Cannot cast a call instruction to llvm::CallInst");
 				assert(false && "Cannot cast a call instruction to llvm::CallInst");
 			}
 			std::list<range_ptr_t> arg_ranges;
@@ -295,9 +295,11 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 						auto res_it = return_values.find(f);
 						res = res_it->second;
 					} else {
+						emitError("exceeding recursion count");
 						// TODO handle exceeding recursion count case
 					}
 				} else {
+					emitError("call to unknown function");
 					// TODO handle case of external function call
 					// TODO handle case of llvm intrinsics function call
 				}
@@ -334,7 +336,8 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		}
 #endif
 		else {
-		  dbgs() << "[Warning] Instruction not supported :" << i << "\n";
+			const std::string message = "unknown instruction " + i.getOpcode();
+			emitError(message);
 			// TODO here be dragons
 		}
 	}
@@ -428,5 +431,14 @@ void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const range_ptr_t& 
 	// 	// TODO maybe check if more/less accurate
 	// }
 	derived_ranges[v] = info;
+	return;
+}
+
+//-----------------------------------------------------------------------------
+// PRINT ERROR MESSAGE
+//-----------------------------------------------------------------------------
+void ValueRangeAnalysis::emitError(const std::string& message) const
+{
+	dbgs() << "[TAFFO] Value Range Analysis: " << message << "\n";
 	return;
 }

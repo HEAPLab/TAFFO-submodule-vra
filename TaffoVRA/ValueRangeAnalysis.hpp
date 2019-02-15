@@ -48,6 +48,8 @@ private:
 
 	void saveValueInfo(const llvm::Value* v, const range_ptr_t& info);
 
+	void emitError(const std::string& message) const;
+
 	// data structures
 private:
 	const unsigned bb_base_priority = 1;
