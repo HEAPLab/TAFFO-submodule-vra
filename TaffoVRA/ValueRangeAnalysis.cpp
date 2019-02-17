@@ -96,13 +96,14 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		}
 
 		// retrieve info about function parameters
-		SmallVector<mdutils::InputInfo*, 5> argsII;
+		SmallVector<mdutils::MDInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
 		fun_arg_input[&f] = std::list<range_ptr_t>();
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
-			if (*itII != nullptr && isValidRange((*itII)->IRange)) {
-				fun_arg_input[&f].push_back(make_range((*itII)->IRange->Min,
-				                                      (*itII)->IRange->Max));
+			// TODO: struct support
+			InputInfo *ii = dyn_cast<InputInfo>(*itII);
+			if (ii != nullptr && isValidRange(ii->IRange)) {
+				fun_arg_input[&f].push_back(make_range(ii->IRange->Min, ii->IRange->Max));
 			} else {
 				fun_arg_input[&f].push_back(nullptr);
 			}
