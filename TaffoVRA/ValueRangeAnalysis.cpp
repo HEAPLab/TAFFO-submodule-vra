@@ -358,7 +358,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 				case llvm::Instruction::AtomicRMW:
 					break; // TODO implement
 				default:
-					emitError("unknown instruction " + opCode);
+					emitError("unknown instruction " + std::to_string(opCode));
 					break;
 				}
 			// TODO here be dragons
@@ -390,13 +390,15 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 	for (auto &f : M.functions()) {
 
 		// arg range
-		SmallVector<mdutils::InputInfo*, 5> argsII;
+		SmallVector<mdutils::MDInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
 		auto argsIt = argsII.begin();
 		for (Argument &arg : f.args()) {
 			const auto range = fetchInfo(&arg);
 			if (range != nullptr) {
-				(*argsIt)->IRange = new Range(range->min(), range->max());
+				// TODO struct support
+				InputInfo *ii = cast<InputInfo>(*argsIt);
+				ii->IRange = new Range(range->min(), range->max());
 			} else {
 				// TODO set default
 			}
