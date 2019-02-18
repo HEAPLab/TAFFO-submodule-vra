@@ -89,6 +89,8 @@ range_ptr_t getAlwaysFalse();
 /** create a always false boolean range */
 range_ptr_t getAlwaysTrue();
 
+range_ptr_t getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2);
+
 }
 
 

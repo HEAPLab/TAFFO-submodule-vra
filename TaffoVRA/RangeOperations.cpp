@@ -321,3 +321,17 @@ range_ptr_t taffo::getAlwaysTrue()
 	range_ptr_t res = make_range(static_cast<num_t>(1), static_cast<num_t>(1));
 	return res;
 }
+
+/** create a union between ranges */
+range_ptr_t taffo::getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2)
+{
+	if (!op1) {
+		return copyRange(op2);
+	}
+	if (!op2) {
+		return copyRange(op1);
+	}
+	const num_t min = std::min({op1->min(), op2->min()});
+	const num_t max = std::max({op1->max(), op2->max()});
+	return make_range(min, max);
+}
