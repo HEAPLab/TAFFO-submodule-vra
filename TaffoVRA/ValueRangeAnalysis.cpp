@@ -339,13 +339,16 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		}
 #endif
 		else {
+			range_ptr_t tmp;
 			switch (opCode) {
 				// memory operations
 				case llvm::Instruction::Alloca:
 					// do nothing
 					break;
 				case llvm::Instruction::Load:
-					break; // TODO implement
+					tmp = handleLoadInstr(&i);
+					saveValueInfo(&i, tmp);
+					break;
 				case llvm::Instruction::Store:
 					handleStoreInstr(&i);
 					break;
