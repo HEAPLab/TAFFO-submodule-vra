@@ -44,10 +44,15 @@ private:
 
 	void saveResults(llvm::Module &M);
 
-	void handleStoreInstr(const llvm::Instruction* store);
+	inline void handleStoreInstr(const llvm::Instruction* store);
 
-	range_ptr_t handleLoadInstr(const llvm::Instruction* load);
+	inline range_ptr_t handleLoadInstr(const llvm::Instruction* load);
 
+	inline range_ptr_t find_ret_val(const llvm::Function* f);
+
+	inline unsigned find_recursion_count(const llvm::Function* f);
+
+protected:
 	const range_ptr_t fetchInfo(const llvm::Value* v) const;
 
 	void saveValueInfo(const llvm::Value* v, const range_ptr_t& info);
@@ -58,7 +63,7 @@ private:
 private:
 	const unsigned bb_base_priority = 1;
 	unsigned default_loop_iteration_count = 1;
-	// unsigned default_function_recursion_count = 0;
+	const unsigned default_function_recursion_count = 0;
 
 	// TODO find a better ID than pointer to llvm::Value. Value name?
 	llvm::DenseMap<const llvm::Value*, range_ptr_t> user_input;
@@ -76,6 +81,7 @@ private:
 
 	std::vector<llvm::Function*> call_stack;
 	llvm::DenseMap<const llvm::Function*, range_ptr_t> return_values;
+	// TODO return_values needs to be duplicated into partial and final to properly handle recursion
 
 };
 

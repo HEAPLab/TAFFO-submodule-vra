@@ -158,12 +158,9 @@ void ValueRangeAnalysis::processModule(Module &M)
 void ValueRangeAnalysis::processFunction(llvm::Function& F)
 {
 	// if already available, no need to execute again
-	auto it = return_values.find(&F);
-	if (it != return_values.end()) {
-		range_ptr_t tmp = it->second;
-		if (tmp != nullptr) {
-			return;
-		}
+	range_ptr_t tmp = find_ret_val(&F);
+	if (tmp != nullptr) {
+		return;
 	}
 
 	// fetch info about actual parameters
@@ -466,6 +463,34 @@ range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
 		return it->second;
 	}
 	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// FIND RETURN VALUE RANGE
+//-----------------------------------------------------------------------------
+range_ptr_t ValueRangeAnalysis::find_ret_val(const llvm::Function* f)
+{
+	using iter_t = decltype(return_values)::const_iterator;
+	iter_t it = return_values.find(f);
+	if (it != return_values.end()) {
+		range_ptr_t tmp = it->second;
+		return tmp;
+	}
+	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// FIND REMAINING RECURSION BUDGET
+//-----------------------------------------------------------------------------
+unsigned ValueRangeAnalysis::find_recursion_count(const llvm::Function* f)
+{
+	using iter_t = decltype(fun_rec_count)::const_iterator;
+	iter_t it = fun_rec_count.find(f);
+	if (it != fun_rec_count.end()) {
+		unsigned tmp = it->second;
+		return tmp;
+	}
+	return default_function_recursion_count;
 }
 
 //-----------------------------------------------------------------------------
