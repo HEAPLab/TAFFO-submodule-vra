@@ -91,14 +91,19 @@ range_ptr_t taffo::handleCastInstruction(const range_ptr_t &op,
 			return copyRange(op);
 			break;
 		case llvm::Instruction::FPTrunc: // TODO implement
+			break;
 		case llvm::Instruction::FPExt: // TODO implement
+			return copyRange(op);
 			break;
 		case llvm::Instruction::PtrToInt:
 		case llvm::Instruction::IntToPtr:
 			return handleCastToSI(op);
 			break;
-		case llvm::Instruction::BitCast: // TODO implement
-		case llvm::Instruction::AddrSpaceCast: // TODO implement
+		case llvm::Instruction::BitCast: // TODO check
+			return copyRange(op);
+			break;
+		case llvm::Instruction::AddrSpaceCast:
+			return copyRange(op);
 			break;
 		default:
 			assert(false); // unsupported operation
