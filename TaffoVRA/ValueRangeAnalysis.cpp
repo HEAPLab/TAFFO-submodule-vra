@@ -486,14 +486,15 @@ const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 	if (const_i) {
 		const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(const_i);
 		if (int_i) {
-			return make_range(static_cast<num_t>(int_i->getSExtValue()),
-			                  static_cast<num_t>(int_i->getSExtValue()));
+			const num_t k = static_cast<num_t>(int_i->getSExtValue());
+			return make_range(k, k);
 		}
 		const llvm::ConstantFP* fp_i = dyn_cast<llvm::ConstantFP>(const_i);
 		if (fp_i) {
-			return make_range(static_cast<num_t>(fp_i->getValueAPF().convertToDouble()),
-			                  static_cast<num_t>(fp_i->getValueAPF().convertToDouble()));
+			const num_t k = static_cast<num_t>(fp_i->getValueAPF().convertToDouble());
+			return make_range(k, k);
 		}
+		emitError("Could not fetch range from llvm::Constant");
 		// TODO derive range
 	}
 	// no info available
