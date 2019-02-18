@@ -42,6 +42,14 @@ private:
 
 	void processBasicBlock(llvm::BasicBlock& BB);
 
+	// terminator instructions cannot be offloaded to other files as they act on
+	// local structures
+	void handleTerminators(const llvm::Instruction* term);
+
+	inline void handleInvoke(const llvm::Instruction* inv);
+
+	inline void handleReturn(const llvm::Instruction* ret);
+
 	void saveResults(llvm::Module &M);
 
 	inline void handleStoreInstr(const llvm::Instruction* store);

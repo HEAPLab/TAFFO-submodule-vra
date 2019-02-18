@@ -308,7 +308,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		}
 		else if (Instruction::isTerminator(opCode))
 		{
-			// TODO handle special case
+			handleTerminators(&i);
 		}
 		else if (Instruction::isCast(opCode))
 		{
@@ -364,6 +364,118 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			// TODO here be dragons
 		} // end else
 	}
+	return;
+}
+
+//-----------------------------------------------------------------------------
+// HANDLE BB TERMINATORS
+//-----------------------------------------------------------------------------
+void ValueRangeAnalysis::handleTerminators(const llvm::Instruction* term)
+{
+	const unsigned opCode = term->getOpcode();
+	switch (opCode) {
+		case llvm::Instruction::Ret:
+			handleReturn(term);
+			break;
+		case llvm::Instruction::Br:
+			emitError("Handling of Br not implemented yet");
+			break; // TODO implement
+		case llvm::Instruction::Switch:
+			emitError("Handling of Switch not implemented yet");
+			break; // TODO implement
+		case llvm::Instruction::IndirectBr:
+			emitError("Handling of IndirectBr not implemented yet");
+			break; // TODO implement
+		case llvm::Instruction::Invoke:
+			handleInvoke(term);
+			break;
+		case llvm::Instruction::Resume:
+			emitError("Handling of Resume not implemented yet");
+			break; // TODO implement
+		case llvm::Instruction::Unreachable:
+			emitError("Handling of Unreachable not implemented yet");
+			break; // TODO implement
+		case llvm::Instruction::CleanupRet:
+			emitError("Handling of CleanupRet not implemented yet");
+			break; // TODO implement
+		case llvm::Instruction::CatchRet:
+			emitError("Handling of CatchRet not implemented yet");
+			break; // TODO implement
+		case llvm::Instruction::CatchSwitch:
+			emitError("Handling of CatchSwitch not implemented yet");
+			break; // TODO implement
+		default:
+			break;
+	}
+
+	return;
+}
+
+//-----------------------------------------------------------------------------
+// HANDLE INVOKE INSTRUCITON
+//-----------------------------------------------------------------------------
+void ValueRangeAnalysis::handleInvoke(const llvm::Instruction* inv)
+{
+	const llvm::InvokeInst* inv_i = dyn_cast<llvm::InvokeInst>(inv);
+	if (!inv_i) {
+		emitError("Could not convert Invoke Instruction to llvm::InvokeInst");
+		return;
+	}
+	llvm::Function* called_fun = inv_i->getCalledFunction();
+	bool shouldProcess = true;
+
+	// check call stack
+	bool found = false;
+	for (size_t i = 0; i < call_stack.size() && !found; i++) {
+		if (call_stack[i] == called_fun) {
+			found = true;
+			// handle recursion
+			unsigned rec_count = find_recursion_count(called_fun);
+			if (rec_count > 0) {
+				fun_rec_count[called_fun] = rec_count - 1;
+			} else {
+				// exceeded recursion budget - skip this recursion
+				shouldProcess = false;
+			}
+		}
+	}
+
+	if (!found) {
+		// not a recursive call
+		range_ptr_t range = find_ret_val(called_fun);
+		//check if already processed
+		if (range) {
+			saveValueInfo(inv, range);
+			return;
+		}
+	}
+
+	// eventually process function
+	if (shouldProcess) {
+		processFunction(*called_fun);
+	}
+
+	// fetch return value - if any
+	range_ptr_t range2 = find_ret_val(called_fun);
+	saveValueInfo(inv, range2);
+	return;
+}
+
+//-----------------------------------------------------------------------------
+// HANDLE RETURN INSTRUCITON
+//-----------------------------------------------------------------------------
+void ValueRangeAnalysis::handleReturn(const llvm::Instruction* ret)
+{
+	const llvm::ReturnInst* ret_i = dyn_cast<llvm::ReturnInst>(ret);
+	if (!ret_i) {
+		emitError("Could not convert Return Instruction to llvm::ReturnInstr");
+		return;
+	}
+	const llvm::Value* ret_val = ret_i->getReturnValue();
+	const llvm::Function* ret_fun = ret_i->getFunction();
+	range_ptr_t range = fetchInfo(ret_val);
+	range_ptr_t partial = find_ret_val(ret_fun);
+	return_values[ret_fun] = getUnionRange(partial, range);
 	return;
 }
 
