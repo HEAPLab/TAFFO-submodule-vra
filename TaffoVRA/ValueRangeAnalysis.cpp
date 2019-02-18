@@ -506,12 +506,12 @@ const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 //-----------------------------------------------------------------------------
 void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const range_ptr_t& info)
 {
-	// if (const auto it = user_input.find(v) != user_input.end()) {
-	// 	// TODO maybe check if more/less accurate
-	// }
-	// if (const auto it = derived_ranges.find(v) != derived_ranges.end()) {
-	// 	// TODO maybe check if more/less accurate
-	// }
+	using iter_t = decltype(derived_ranges)::const_iterator;
+	iter_t it = derived_ranges.find(v);
+	if (it != derived_ranges.end()) {
+		derived_ranges[v] = getUnionRange(it->second, info);
+		return;
+	}
 	derived_ranges[v] = info;
 	return;
 }
