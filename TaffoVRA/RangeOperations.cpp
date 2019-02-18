@@ -153,6 +153,9 @@ range_ptr_t taffo::handleOtherInstructions(const std::list<range_ptr_t > &op,
 /** operator+ */
 range_ptr_t taffo::handleAdd(const range_ptr_t &op1, const range_ptr_t &op2)
 {
+	if (!op1 || !op2) {
+		return nullptr;
+	}
 	num_t a = op1->min() + op2->min();
 	num_t b = op1->max() + op2->max();
 	return make_range(a,b);
@@ -161,6 +164,9 @@ range_ptr_t taffo::handleAdd(const range_ptr_t &op1, const range_ptr_t &op2)
 /** operator- */
 range_ptr_t taffo::handleSub(const range_ptr_t &op1, const range_ptr_t &op2)
 {
+	if (!op1 || !op2) {
+		return nullptr;
+	}
 	num_t a = op1->min() - op2->max();
 	num_t b = op1->max() - op2->min();
 	return make_range(a,b);
@@ -169,6 +175,9 @@ range_ptr_t taffo::handleSub(const range_ptr_t &op1, const range_ptr_t &op2)
 /** operator* */
 range_ptr_t taffo::handleMul(const range_ptr_t &op1, const range_ptr_t &op2)
 {
+	if (!op1 || !op2) {
+		return nullptr;
+	}
 	num_t a = op1->min() * op2->min();
 	num_t b = op1->max() * op2->max();
 	num_t c = op1->min() * op2->max();
@@ -181,6 +190,9 @@ range_ptr_t taffo::handleMul(const range_ptr_t &op1, const range_ptr_t &op2)
 /** operator/ */
 range_ptr_t taffo::handleDiv(const range_ptr_t &op1, const range_ptr_t &op2)
 {
+	if (!op1 || !op2) {
+		return nullptr;
+	}
 	num_t a = op1->min() / op2->min();
 	num_t b = op1->max() / op2->max();
 	num_t c = op1->min() / op2->max();
@@ -193,6 +205,9 @@ range_ptr_t taffo::handleDiv(const range_ptr_t &op1, const range_ptr_t &op2)
 /** operator% */
 range_ptr_t taffo::handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
 {
+	if (!op1 || !op2) {
+		return nullptr;
+	}
 	const bool alwaysNeg = op1->max() <= 0;
 	const bool alwaysPos = op1->min() >= 0;
 	const num_t bound = fabs(op2->max()) - std::numeric_limits<num_t>::epsilon();
@@ -204,6 +219,9 @@ range_ptr_t taffo::handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
 /** CastToUInteger */
 range_ptr_t taffo::handleCastToUI(const range_ptr_t &op)
 {
+	if (!op) {
+		return nullptr;
+	}
 	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(op->min()));
 	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(op->max()));
 	return make_range(r1,r2);
@@ -212,6 +230,9 @@ range_ptr_t taffo::handleCastToUI(const range_ptr_t &op)
 /** CastToUInteger */
 range_ptr_t taffo::handleCastToSI(const range_ptr_t &op)
 {
+	if (!op) {
+		return nullptr;
+	}
 	const num_t r1 = static_cast<num_t>(static_cast<long>(op->min()));
 	const num_t r2 = static_cast<num_t>(static_cast<long>(op->max()));
 	return make_range(r1,r2);
@@ -221,6 +242,9 @@ range_ptr_t taffo::handleCastToSI(const range_ptr_t &op)
 range_ptr_t taffo::handleBooleanXor(const range_ptr_t &op1,
                                     const range_ptr_t &op2)
 {
+	if (!op1 || !op2) {
+		return getGenericBoolRange();
+	}
 	if (!op1->cross() && !op2->cross()) {
 		return getAlwaysFalse();
 	}
@@ -234,6 +258,9 @@ range_ptr_t taffo::handleBooleanXor(const range_ptr_t &op1,
 range_ptr_t taffo::handleBooleanAnd(const range_ptr_t &op1,
                                     const range_ptr_t &op2)
 {
+	if (!op1 || !op2) {
+		return getGenericBoolRange();
+	}
 	if (!op1->cross() && !op2->cross()) {
 		return getAlwaysTrue();
 	}
@@ -247,6 +274,9 @@ range_ptr_t taffo::handleBooleanAnd(const range_ptr_t &op1,
 range_ptr_t taffo::handleBooleanOr(const range_ptr_t &op1,
                                    const range_ptr_t &op2)
 {
+	if (!op1 || !op2) {
+		return getGenericBoolRange();
+	}
 	if (!op1->cross() || !op2->cross()) {
 		return getAlwaysTrue();
 	}
@@ -259,6 +289,9 @@ range_ptr_t taffo::handleBooleanOr(const range_ptr_t &op1,
 /** deep copy of range */
 range_ptr_t taffo::copyRange(const range_ptr_t &op)
 {
+	if (!op) {
+		return nullptr;
+	}
 	range_ptr_t res = make_range(op->min(), op->max());
 	return res;
 }
