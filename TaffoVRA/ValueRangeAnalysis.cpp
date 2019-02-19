@@ -304,13 +304,39 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 					handleStoreInstr(&i);
 					break;
 				case llvm::Instruction::GetElementPtr:
+					emitError("Handling of GetElementPtr not supported yet");
 					break; // TODO implement
 				case llvm::Instruction::Fence:
+					emitError("Handling of Fence not supported yet");
 					break; // TODO implement
 				case llvm::Instruction::AtomicCmpXchg:
+					emitError("Handling of AtomicCmpXchg not supported yet");
 					break; // TODO implement
 				case llvm::Instruction::AtomicRMW:
+					emitError("Handling of AtomicRMW not supported yet");
 					break; // TODO implement
+
+				// other operations
+				case llvm::Instruction::ICmp:
+				case llvm::Instruction::FCmp:
+					tmp = handleCmpInstr(&i);
+					saveValueInfo(&i, tmp);
+					break;
+				case llvm::Instruction::PHI: // TODO implement
+					emitError("Handling of Phi not supported yet");
+					break;
+				// case llvm::Instruction::Call: // already handled
+				case llvm::Instruction::Select: // TODO implement
+				case llvm::Instruction::UserOp1: // TODO implement
+				case llvm::Instruction::UserOp2: // TODO implement
+				case llvm::Instruction::VAArg: // TODO implement
+				case llvm::Instruction::ExtractElement: // TODO implement
+				case llvm::Instruction::InsertElement: // TODO implement
+				case llvm::Instruction::ShuffleVector: // TODO implement
+				case llvm::Instruction::ExtractValue: // TODO implement
+				case llvm::Instruction::InsertValue: // TODO implement
+				case llvm::Instruction::LandingPad: // TODO implement
+					break;
 				default:
 					emitError("unknown instruction " + std::to_string(opCode));
 					break;
@@ -568,6 +594,27 @@ range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
 		return it->second;
 	}
 	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// HANDLE COMPARE OPERATIONS
+//-----------------------------------------------------------------------------
+range_ptr_t ValueRangeAnalysis::handleCmpInstr(const llvm::Instruction* cmp)
+{
+	const llvm::CmpInst* cmp_i = dyn_cast<llvm::CmpInst>(cmp);
+	if (!cmp_i) {
+		emitError("Could not convert Compare instruction to CmpInst");
+		return nullptr;
+	}
+	const llvm::CmpInst::Predicate pred = cmp_i->getPredicate();
+	std::list<range_ptr_t> ranges;
+	for (unsigned index = 0; index < cmp_i->getNumOperands(); index++) {
+		const llvm::Value* op = cmp_i->getOperand(index);
+		range_ptr_t op_range = fetchInfo(op);
+		ranges.push_back(op_range);
+	}
+	range_ptr_t res = handleCompare(ranges, pred);
+	return res;
 }
 
 //-----------------------------------------------------------------------------

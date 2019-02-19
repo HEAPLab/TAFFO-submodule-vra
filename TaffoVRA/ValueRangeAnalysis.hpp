@@ -64,6 +64,8 @@ private:
 
 	inline range_ptr_t handleLoadInstr(const llvm::Instruction* load);
 
+	inline range_ptr_t handleCmpInstr(const llvm::Instruction* cmp);
+
 	inline range_ptr_t find_ret_val(const llvm::Function* f);
 
 	inline unsigned find_recursion_count(const llvm::Function* f);
