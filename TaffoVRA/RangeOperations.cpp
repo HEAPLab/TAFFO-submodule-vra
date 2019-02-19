@@ -123,33 +123,116 @@ range_ptr_t taffo::handleMathCallInstruction(const std::list<range_ptr_t>& ops,
 	return nullptr;
 }
 
-/** Other instructions */
-range_ptr_t taffo::handleOtherInstructions(const std::list<range_ptr_t > &op,
-                                           const unsigned OpCode)
+/** Handle call to known math functions. Return nullptr if unknown */
+range_ptr_t taffo::handleCompare(const std::list<range_ptr_t>& ops,
+                                 const llvm::CmpInst::Predicate pred)
 {
-	switch (OpCode) {
-		case llvm::Instruction::ICmp: // TODO implement
-		case llvm::Instruction::FCmp: // TODO implement
-		case llvm::Instruction::PHI: // TODO implement
-		case llvm::Instruction::Call: // TODO implement
-		case llvm::Instruction::Select: // TODO implement
-		case llvm::Instruction::UserOp1: // TODO implement
-		case llvm::Instruction::UserOp2: // TODO implement
-		case llvm::Instruction::VAArg: // TODO implement
-		case llvm::Instruction::ExtractElement: // TODO implement
-		case llvm::Instruction::InsertElement: // TODO implement
-		case llvm::Instruction::ShuffleVector: // TODO implement
-		case llvm::Instruction::ExtractValue: // TODO implement
-		case llvm::Instruction::InsertValue: // TODO implement
-		case llvm::Instruction::LandingPad: // TODO implement
-			break;
+	switch (pred) {
+		case llvm::CmpInst::Predicate::FCMP_FALSE:
+			return getAlwaysFalse();
+		case llvm::CmpInst::Predicate::FCMP_TRUE:
+			return getAlwaysTrue();
 		default:
-			assert(false); // unsupported operation
 			break;
+	}
+
+	// from now on only 2 operators compare
+	assert(ops.size() > 1 && "too few operators in compare instruction");
+	assert(ops.size() <= 2 && "too many operators in compare instruction");
+
+	// extract values for easy access
+	range_ptr_t lhs = ops.front();
+	range_ptr_t rhs = ops.back();
+	// if unavailable data, nothing can be said
+	if (!lhs || !rhs) {
+		return getGenericBoolRange();
+	}
+
+	// NOTE: not dealing with Ordered / Unordered variants
+	switch (pred) {
+		case llvm::CmpInst::Predicate::FCMP_OEQ:
+		case llvm::CmpInst::Predicate::FCMP_UEQ:
+		case llvm::CmpInst::Predicate::ICMP_EQ:
+			if (lhs->min() == lhs->max()
+			    && rhs->min() == rhs->max()
+			    && lhs->min() == rhs->min())
+			{
+				return getAlwaysTrue();
+			} else if (lhs->max() < rhs->min() || rhs->max() < lhs->min()) {
+				return getAlwaysFalse();
+			} else {
+				return getGenericBoolRange();
+			}
+			break;
+		case llvm::CmpInst::Predicate::FCMP_OGT:
+		case llvm::CmpInst::Predicate::FCMP_UGT:
+		case llvm::CmpInst::Predicate::ICMP_UGT:
+		case llvm::CmpInst::Predicate::ICMP_SGT:
+			if (lhs->min() > rhs->max()) {
+				return getAlwaysTrue();
+			} else if (lhs->max() <= rhs->min()) {
+				return getAlwaysFalse();
+			} else {
+				return getGenericBoolRange();
+			}
+			break;
+		case llvm::CmpInst::Predicate::FCMP_OGE:
+		case llvm::CmpInst::Predicate::FCMP_UGE:
+		case llvm::CmpInst::Predicate::ICMP_UGE:
+		case llvm::CmpInst::Predicate::ICMP_SGE:
+			if (lhs->min() >= rhs->max()) {
+				return getAlwaysTrue();
+			} else if (lhs->max() < rhs->min()) {
+				return getAlwaysFalse();
+			} else {
+				return getGenericBoolRange();
+			}
+			break;
+		case llvm::CmpInst::Predicate::FCMP_OLT:
+		case llvm::CmpInst::Predicate::FCMP_ULT:
+		case llvm::CmpInst::Predicate::ICMP_ULT:
+		case llvm::CmpInst::Predicate::ICMP_SLT:
+			if (lhs->max() < rhs->min()) {
+				return getAlwaysTrue();
+			} else if (lhs->min() >= rhs->max()) {
+				return getAlwaysFalse();
+			} else {
+				return getGenericBoolRange();
+			}
+			break;
+		case llvm::CmpInst::Predicate::FCMP_OLE:
+		case llvm::CmpInst::Predicate::FCMP_ULE:
+		case llvm::CmpInst::Predicate::ICMP_ULE:
+		case llvm::CmpInst::Predicate::ICMP_SLE:
+			if (lhs->max() <= rhs->min()) {
+				return getAlwaysTrue();
+			} else if (lhs->min() > rhs->max()) {
+				return getAlwaysFalse();
+			} else {
+				return getGenericBoolRange();
+			}
+			break;
+		case llvm::CmpInst::Predicate::FCMP_ONE:
+		case llvm::CmpInst::Predicate::FCMP_UNE:
+		case llvm::CmpInst::Predicate::ICMP_NE:
+			if (lhs->min() == lhs->max()
+					&& rhs->min() == rhs->max()
+					&& lhs->min() == rhs->min())
+			{
+				return getAlwaysFalse();
+			} else if (lhs->max() < rhs->min() || rhs->max() < lhs->min()) {
+				return getAlwaysTrue();
+			} else {
+				return getGenericBoolRange();
+			}
+			break;
+		case llvm::CmpInst::Predicate::FCMP_ORD: // none of the operands is NaN
+		case llvm::CmpInst::Predicate::FCMP_UNO: // one of the operand is NaN
+		// TODO implement
+		break;
 	}
 	return nullptr;
 }
-
 
 //-----------------------------------------------------------------------------
 // Arithmetic

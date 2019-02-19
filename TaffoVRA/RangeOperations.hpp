@@ -6,6 +6,7 @@
 
 #include "Range.hpp"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/InstrTypes.h"
 
 namespace taffo {
 
@@ -31,9 +32,8 @@ range_ptr_t handleCastInstruction(const range_ptr_t &op,
 range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
                                       const std::string &function);
 
-/** Other instructions */
-range_ptr_t handleOtherInstructions(const std::list<range_ptr_t > &op,
-                                    const unsigned OpCode);
+range_ptr_t handleCompare(const std::list<range_ptr_t>& ops,
+                          const llvm::CmpInst::Predicate pred);
 
 //-----------------------------------------------------------------------------
 // Arithmetic
