@@ -613,20 +613,83 @@ const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 	}
 	const llvm::Constant* const_i = dyn_cast<llvm::Constant>(v);
 	if (const_i) {
-		const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(const_i);
-		if (int_i) {
-			const num_t k = static_cast<num_t>(int_i->getSExtValue());
-			return make_range(k, k);
-		}
-		const llvm::ConstantFP* fp_i = dyn_cast<llvm::ConstantFP>(const_i);
-		if (fp_i) {
-			const num_t k = static_cast<num_t>(fp_i->getValueAPF().convertToDouble());
-			return make_range(k, k);
-		}
-		emitError("Could not fetch range from llvm::Constant");
-		// TODO derive range
+		return fetchConstant(const_i);
 	}
 	// no info available
+	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// HELPER TO EXTRACT VALUE FROM A CONSTANT
+//-----------------------------------------------------------------------------
+range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval) const
+{
+	const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(kval);
+	if (int_i) {
+		const num_t k = static_cast<num_t>(int_i->getSExtValue());
+		return make_range(k, k);
+	}
+	const llvm::ConstantFP* fp_i = dyn_cast<llvm::ConstantFP>(kval);
+	if (fp_i) {
+		const num_t k = static_cast<num_t>(fp_i->getValueAPF().convertToDouble());
+		return make_range(k, k);
+	}
+	const llvm::ConstantData* data = dyn_cast<llvm::ConstantData>(kval);
+	if (data) {
+		emitError("Extract value from llvm::ConstantData not implemented yet");
+		return nullptr;
+	}
+	const llvm::ConstantExpr* cexp_i = dyn_cast<llvm::ConstantExpr>(kval);
+	if (cexp_i) {
+		emitError("Could not fold a llvm::ConstantExpr");
+		return nullptr;
+	}
+	const llvm::ConstantAggregate* aggr_i = dyn_cast<llvm::ConstantAggregate>(kval);
+	if (aggr_i) {
+		// TODO implement
+		emitError("Constant aggregates not supported yet");
+		return nullptr;
+	}
+	const llvm::BlockAddress* block_i = dyn_cast<llvm::BlockAddress>(kval);
+	if (block_i) {
+		emitError("Could not fetch range from llvm::BlockAddress");
+		return nullptr;
+	}
+	const llvm::GlobalValue* gv_i = dyn_cast<llvm::GlobalValue>(kval);
+	if (gv_i) {
+		const llvm::GlobalVariable* gvar_i = dyn_cast<llvm::GlobalVariable>(kval);
+		if (gvar_i) {
+			if (gvar_i->hasInitializer()) {
+				const llvm::Constant* init_val = gvar_i->getInitializer();
+				if (init_val) {
+					return fetchConstant(init_val);
+				}
+			}
+			emitError("Could not derive range from a Global Variable");
+			return nullptr;
+		}
+		const llvm::GlobalAlias* alias_i = dyn_cast<llvm::GlobalAlias>(kval);
+		if (alias_i) {
+			emitError("Found alias");
+			const llvm::Constant* aliasee = alias_i->getAliasee();
+			return (aliasee) ? fetchConstant(aliasee) : nullptr;
+		}
+		const llvm::Function* f = dyn_cast<llvm::Function>(kval);
+		if (f) {
+			emitError("Could not derive range from a Constant Function");
+			return nullptr;
+		}
+		const llvm::GlobalIFunc* fun_decl = dyn_cast<llvm::GlobalIFunc>(kval);
+		if (fun_decl) {
+			emitError("Could not derive range from a Function declaration");
+			return nullptr;
+		}
+		// this line should never be reached
+		emitError("Could not fetch range from llvm::GlobalValue");
+		return nullptr;
+	}
+	emitError("Could not fetch range from llvm::Constant");
+	// TODO did I forgot something?
 	return nullptr;
 }
 
