@@ -658,6 +658,6 @@ void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const range_ptr_t& 
 //-----------------------------------------------------------------------------
 void ValueRangeAnalysis::emitError(const std::string& message) const
 {
-	dbgs() << "[TAFFO] Value Range Analysis: " << message << "\n";
+	llvm::dbgs() << "[TAFFO] Value Range Analysis: " << message << "\n";
 	return;
 }
