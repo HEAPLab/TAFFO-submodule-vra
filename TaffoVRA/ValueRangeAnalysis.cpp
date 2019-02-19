@@ -563,7 +563,7 @@ range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
 	// TODO check for possible alias
 	using const_it = decltype(memory)::const_iterator;
 	const_it it = memory.find(address_param);
-	if (address_param) {
+	if (it != memory.end()) {
 		return it->second;
 	}
 	return nullptr;
