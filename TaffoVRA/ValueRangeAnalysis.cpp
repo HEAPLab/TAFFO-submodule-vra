@@ -623,7 +623,7 @@ const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 //-----------------------------------------------------------------------------
 // HELPER TO EXTRACT VALUE FROM A CONSTANT
 //-----------------------------------------------------------------------------
-range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval) const
+range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval)
 {
 	const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(kval);
 	if (int_i) {
@@ -712,7 +712,7 @@ void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const range_ptr_t& 
 //-----------------------------------------------------------------------------
 // PRINT ERROR MESSAGE
 //-----------------------------------------------------------------------------
-void ValueRangeAnalysis::emitError(const std::string& message) const
+void ValueRangeAnalysis::emitError(const std::string& message)
 {
 	llvm::dbgs() << "[TAFFO] Value Range Analysis: " << message << "\n";
 	return;

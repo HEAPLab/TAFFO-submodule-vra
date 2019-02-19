@@ -68,14 +68,14 @@ private:
 
 	inline unsigned find_recursion_count(const llvm::Function* f);
 
-	inline range_ptr_t fetchConstant(const llvm::Constant* v) const;
-
 protected:
 	const range_ptr_t fetchInfo(const llvm::Value* v) const;
 
 	void saveValueInfo(const llvm::Value* v, const range_ptr_t& info);
 
-	void emitError(const std::string& message) const;
+	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
+
+	static void emitError(const std::string& message);
 
 	// data structures
 private:
