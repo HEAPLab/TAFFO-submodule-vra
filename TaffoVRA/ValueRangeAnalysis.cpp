@@ -332,8 +332,9 @@ void ValueRangeAnalysis::handleTerminators(const llvm::Instruction* term)
 			handleReturn(term);
 			break;
 		case llvm::Instruction::Br:
-			emitError("Handling of Br not implemented yet");
-			break; // TODO implement
+			// TODO improve by checking condition and relatevely update BB weigths
+			// do nothing
+			break;
 		case llvm::Instruction::Switch:
 			emitError("Handling of Switch not implemented yet");
 			break; // TODO implement
