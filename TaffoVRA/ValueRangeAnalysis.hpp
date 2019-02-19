@@ -46,7 +46,15 @@ private:
 	// local structures
 	void handleTerminators(const llvm::Instruction* term);
 
-	inline void handleInvoke(const llvm::Instruction* inv);
+	// llvm::CallBase was promoted from template to Class in LLVM 8.0.0
+#if LLVM_VERSION < 8
+	inline void handleCallInst(const llvm::Instruction* call);
+
+	inline void handleInvokeInst(const llvm::Instruction* call);
+
+	template<typename CallBase>
+#endif
+	inline void handleCallBase(const llvm::Instruction* call);
 
 	inline void handleReturn(const llvm::Instruction* ret);
 

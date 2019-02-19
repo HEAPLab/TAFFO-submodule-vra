@@ -5,6 +5,8 @@
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
@@ -252,59 +254,11 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		const unsigned opCode = i.getOpcode();
 		if (opCode == Instruction::Call)
 		{
-			llvm::CallInst* call_i = dyn_cast<llvm::CallInst>(&i);
-			if (!call_i) {
-				emitError("Cannot cast a call instruction to llvm::CallInst");
-				assert(false && "Cannot cast a call instruction to llvm::CallInst");
-			}
-			// fetch function name
-			llvm::Function* callee = call_i->getCalledFunction();
-			const std::string calledFunctionName = callee->getName();
-			std::list<range_ptr_t> arg_ranges;
-			for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
-			{
-				const llvm::Value* arg = *arg_it;
-				const range_ptr_t arg_info = fetchInfo(arg);
-				arg_ranges.push_back(arg_info);
-			}
-
-			// first check if it is among the whitelisted functions we can handle
-			range_ptr_t res = handleMathCallInstruction(arg_ranges, calledFunctionName);
-
-			// if not a whitelisted then try to fetch it from Module
-			if (!res) {
-				// fetch llvm::Function
-				auto function = known_functions.find(calledFunctionName);
-				if (function != known_functions.end()) {
-					// got the llvm::Function
-					llvm::Function* f = function->second;
-
-					// check for recursion
-					size_t call_count = 0;
-					for (size_t i = 0; i < call_stack.size(); i++) {
-						if (call_stack[i] == f) {
-							call_count++;
-						}
-					}
-					if (call_count <= fun_rec_count[f]) {
-						// Can process
-						// update parameter metadata
-						fun_arg_derived[f] = arg_ranges;
-						processFunction(*f);
-						// fetch function return value
-						auto res_it = return_values.find(f);
-						res = res_it->second;
-					} else {
-						emitError("exceeding recursion count");
-						// TODO handle exceeding recursion count case
-					}
-				} else {
-					emitError("call to unknown function");
-					// TODO handle case of external function call
-					// TODO handle case of llvm intrinsics function call
-				}
-			}
-			saveValueInfo(&i, res);
+			#if LLVM_VERSION < 8
+			handleCallInst(&i);
+			#else
+			handleCallBase(&i);
+			#endif
 		}
 		else if (Instruction::isTerminator(opCode))
 		{
@@ -387,7 +341,11 @@ void ValueRangeAnalysis::handleTerminators(const llvm::Instruction* term)
 			emitError("Handling of IndirectBr not implemented yet");
 			break; // TODO implement
 		case llvm::Instruction::Invoke:
-			handleInvoke(term);
+			#if LLVM_VERSION < 8
+			handleInvokeInst(term);
+			#else
+			handleCallBase(term);
+			#endif
 			break;
 		case llvm::Instruction::Resume:
 			emitError("Handling of Resume not implemented yet");
@@ -412,52 +370,86 @@ void ValueRangeAnalysis::handleTerminators(const llvm::Instruction* term)
 }
 
 //-----------------------------------------------------------------------------
-// HANDLE INVOKE INSTRUCITON
+// HANDLE CALL INSTRUCITON
 //-----------------------------------------------------------------------------
-void ValueRangeAnalysis::handleInvoke(const llvm::Instruction* inv)
+// llvm::CallBase was promoted from template to Class in LLVM 8.0.0
+#if LLVM_VERSION < 8
+void ValueRangeAnalysis::handleCallInst(const llvm::Instruction* call)
 {
-	const llvm::InvokeInst* inv_i = dyn_cast<llvm::InvokeInst>(inv);
-	if (!inv_i) {
-		emitError("Could not convert Invoke Instruction to llvm::InvokeInst");
+	return handleCallBase<llvm::CallInst>(call);
+}
+
+void ValueRangeAnalysis::handleInvokeInst(const llvm::Instruction* call)
+{
+	return handleCallBase<llvm::InvokeInst>(call);
+}
+
+template<typename CallBase>
+#else
+using CallBase = llvm::CallBase;
+#endif
+void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
+{
+	const CallBase* call_i = dyn_cast<CallBase>(call);
+	if (!call_i) {
+		emitError("Cannot cast a call instruction to llvm::CallBase");
 		return;
 	}
-	llvm::Function* called_fun = inv_i->getCalledFunction();
-	bool shouldProcess = true;
+	// fetch function name
+	llvm::Function* callee = call_i->getCalledFunction();
+	const std::string calledFunctionName = callee->getName();
+	std::list<range_ptr_t> arg_ranges;
+	for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
+	{
+		const llvm::Value* arg = *arg_it;
+		const range_ptr_t arg_info = fetchInfo(arg);
+		arg_ranges.push_back(arg_info);
+	}
 
-	// check call stack
-	bool found = false;
-	for (size_t i = 0; i < call_stack.size() && !found; i++) {
-		if (call_stack[i] == called_fun) {
-			found = true;
-			// handle recursion
-			unsigned rec_count = find_recursion_count(called_fun);
-			if (rec_count > 0) {
-				fun_rec_count[called_fun] = rec_count - 1;
-			} else {
-				// exceeded recursion budget - skip this recursion
-				shouldProcess = false;
+	// first check if it is among the whitelisted functions we can handle
+	range_ptr_t res = handleMathCallInstruction(arg_ranges, calledFunctionName);
+
+	if (res) {
+		saveValueInfo(call, res);
+		return;
+	}
+
+	// if not a whitelisted then try to fetch it from Module
+	// fetch llvm::Function
+	auto function = known_functions.find(calledFunctionName);
+	if (function != known_functions.end()) {
+		// got the llvm::Function
+		llvm::Function* f = function->second;
+
+		// check for recursion
+		size_t call_count = 0;
+		for (size_t i = 0; i < call_stack.size(); i++) {
+			if (call_stack[i] == f) {
+				call_count++;
 			}
 		}
-	}
-
-	if (!found) {
-		// not a recursive call
-		range_ptr_t range = find_ret_val(called_fun);
-		//check if already processed
-		if (range) {
-			saveValueInfo(inv, range);
-			return;
+		if (call_count <= find_recursion_count(f)) {
+			// Can process
+			// update parameter metadata
+			fun_arg_derived[f] = arg_ranges;
+			processFunction(*f);
+		} else {
+			emitError("Exceeding recursion count - skip call");
+		}
+		// fetch function return value
+		auto res_it = return_values.find(f);
+		res = res_it->second;
+	} else {
+		const auto intrinsicsID = callee->getIntrinsicID();
+		if (intrinsicsID != llvm::Intrinsic::not_intrinsic) {
+			emitError("call to unknown function " + calledFunctionName);
+			// TODO handle case of external function call
+		} else {
+			emitError("skipping intrinsic " + calledFunctionName);
+			// TODO handle case of llvm intrinsics function call
 		}
 	}
-
-	// eventually process function
-	if (shouldProcess) {
-		processFunction(*called_fun);
-	}
-
-	// fetch return value - if any
-	range_ptr_t range2 = find_ret_val(called_fun);
-	saveValueInfo(inv, range2);
+	saveValueInfo(call, res);
 	return;
 }
 
