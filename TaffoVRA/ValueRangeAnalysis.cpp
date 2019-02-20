@@ -285,7 +285,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		{
 			const llvm::Value* op1 = i.getOperand(0);
 			const auto info1 = fetchInfo(op1);
-			const auto res = handleBinaryInstruction(info1, info2, opCode);
+			const auto res = handleUnaryInstruction(info1, opCode);
 			saveValueInfo(&i, res);
 		}
 #endif
