@@ -328,15 +328,32 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 					break;
 				// case llvm::Instruction::Call: // already handled
 				case llvm::Instruction::Select: // TODO implement
+					emitError("Handling of Select not supported yet");
+					break;
 				case llvm::Instruction::UserOp1: // TODO implement
 				case llvm::Instruction::UserOp2: // TODO implement
+					emitError("Handling of UserOp not supported yet");
+					break;
 				case llvm::Instruction::VAArg: // TODO implement
+					emitError("Handling of VAArg not supported yet");
+					break;
 				case llvm::Instruction::ExtractElement: // TODO implement
+					emitError("Handling of ExtractElement not supported yet");
+					break;
 				case llvm::Instruction::InsertElement: // TODO implement
+					emitError("Handling of InsertElement not supported yet");
+					break;
 				case llvm::Instruction::ShuffleVector: // TODO implement
+					emitError("Handling of ShuffleVector not supported yet");
+					break;
 				case llvm::Instruction::ExtractValue: // TODO implement
+					emitError("Handling of ExtractValue not supported yet");
+					break;
 				case llvm::Instruction::InsertValue: // TODO implement
+					emitError("Handling of InsertValue not supported yet");
+					break;
 				case llvm::Instruction::LandingPad: // TODO implement
+					emitError("Handling of LandingPad not supported yet");
 					break;
 				default:
 					emitError("unknown instruction " + std::to_string(opCode));
