@@ -322,8 +322,9 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 					tmp = handleCmpInstr(&i);
 					saveValueInfo(&i, tmp);
 					break;
-				case llvm::Instruction::PHI: // TODO implement
-					emitError("Handling of Phi not supported yet");
+				case llvm::Instruction::PHI:
+					tmp = handlePhiNode(&i);
+					saveValueInfo(&i, tmp);
 					break;
 				// case llvm::Instruction::Call: // already handled
 				case llvm::Instruction::Select: // TODO implement
@@ -594,6 +595,29 @@ range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
 		return it->second;
 	}
 	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// HANDLE PHI NODE
+//-----------------------------------------------------------------------------
+range_ptr_t ValueRangeAnalysis::handlePhiNode(const llvm::Instruction* phi)
+{
+	const llvm::PHINode* phi_n = dyn_cast<llvm::PHINode>(phi);
+	if (!phi_n) {
+		emitError("Could not convert Compare instruction to CmpInst");
+		return nullptr;
+	}
+	if (phi_n->getNumIncomingValues() < 1) {
+		return nullptr;
+	}
+	const llvm::Value* op0 = phi_n->getIncomingValue(0);
+	range_ptr_t res = fetchInfo(op0);
+	for (unsigned index = 1; index < phi_n->getNumIncomingValues(); index++) {
+		const llvm::Value* op = phi_n->getIncomingValue(index);
+		range_ptr_t op_range = fetchInfo(op);
+		res = getUnionRange(res, op_range);
+	}
+	return res;
 }
 
 //-----------------------------------------------------------------------------
