@@ -3,15 +3,20 @@
 
 #include <limits>
 #include <memory>
+#include <vector>
 
 namespace taffo {
 
-// TODO rename into VRA_range
+struct VRA_Generic_Range {
+};
+
+using generic_range_ptr_t = std::shared_ptr<VRA_Generic_Range>;
+
 template<
 	typename num_t,
 	typename = typename std::enable_if<std::is_arithmetic<num_t>::value, num_t>::type
 	>
-struct VRA_Range
+struct VRA_Range : VRA_Generic_Range
 {
 public:
 	VRA_Range(const num_t min, const num_t max) : _min(min), _max(max) {}
@@ -36,6 +41,30 @@ template<class... Args>
 static inline range_ptr_t make_range(Args&&... args) {
   return std::make_shared<VRA_Range<num_t>>(std::forward<Args>(args)...);
 }
+
+struct VRA_Structured_Range : VRA_Generic_Range
+{
+public:
+	VRA_Structured_Range() {_ranges = {nullptr};}
+	VRA_Structured_Range(const generic_range_ptr_t& r) {_ranges = {r};}
+	VRA_Structured_Range(const VRA_Structured_Range& rhs) : _ranges(rhs.ranges()) {}
+
+private:
+	std::vector<generic_range_ptr_t> _ranges;
+
+public:
+	inline const std::vector<generic_range_ptr_t> ranges() const {return _ranges; }
+	inline bool isScalarOrArray() const {return _ranges.size() == 1;}
+	inline bool isStruct() const {return _ranges.size() > 1;}
+	inline generic_range_ptr_t getRangeAt(const size_t index) const {return _ranges[index];}
+};
+
+using range_s_ptr_t = std::shared_ptr<VRA_Structured_Range>;
+template<class... Args>
+static inline range_s_ptr_t make_s_range(Args&&... args) {
+  return std::make_shared<VRA_Structured_Range>(std::forward<Args>(args)...);
 }
+
+} //end namespace
 
 #endif /* end of include guard: TAFFO_VRA_RANGE_HPP */
