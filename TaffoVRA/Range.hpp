@@ -8,6 +8,7 @@
 namespace taffo {
 
 struct VRA_Generic_Range {
+	virtual ~VRA_Generic_Range() = default;
 };
 
 using generic_range_ptr_t = std::shared_ptr<VRA_Generic_Range>;
@@ -36,11 +37,16 @@ public:
 };
 
 using num_t = double;
-using range_ptr_t = std::shared_ptr<VRA_Range<num_t>>;
+using range_t = VRA_Range<num_t>;
+using range_ptr_t = std::shared_ptr<range_t>;
 template<class... Args>
 static inline range_ptr_t make_range(Args&&... args) {
-  return std::make_shared<VRA_Range<num_t>>(std::forward<Args>(args)...);
+  return std::make_shared<range_t>(std::forward<Args>(args)...);
 }
+
+
+struct VRA_Structured_Range;
+using range_s_ptr_t = std::shared_ptr<VRA_Structured_Range>;
 
 struct VRA_Structured_Range : VRA_Generic_Range
 {
@@ -54,12 +60,27 @@ private:
 
 public:
 	inline const std::vector<generic_range_ptr_t> ranges() const {return _ranges; }
+
 	inline bool isScalarOrArray() const {return _ranges.size() == 1;}
+
 	inline bool isStruct() const {return _ranges.size() > 1;}
-	inline generic_range_ptr_t getRangeAt(const size_t index) const {return _ranges[index];}
+
+	inline generic_range_ptr_t getRangeAt(unsigned index) const {return _ranges[index];}
+
+	inline range_ptr_t toScalarRange(unsigned index = 0) const {
+		return std::static_pointer_cast<range_t>(getRangeAt(index));
+	}
+
+	inline range_s_ptr_t toStructRange(unsigned index = 0) const {
+		return std::static_pointer_cast<VRA_Structured_Range>(getRangeAt(index));
+	}
+
+	inline void setRangeAt(unsigned index, const range_ptr_t& range) {
+		_ranges[index] = range;
+	}
+
 };
 
-using range_s_ptr_t = std::shared_ptr<VRA_Structured_Range>;
 template<class... Args>
 static inline range_s_ptr_t make_s_range(Args&&... args) {
   return std::make_shared<VRA_Structured_Range>(std::forward<Args>(args)...);
