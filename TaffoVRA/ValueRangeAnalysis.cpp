@@ -720,7 +720,10 @@ range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval)
 	}
 	const llvm::ConstantFP* fp_i = dyn_cast<llvm::ConstantFP>(kval);
 	if (fp_i) {
-		const num_t k = static_cast<num_t>(fp_i->getValueAPF().convertToDouble());
+		APFloat tmp = fp_i->getValueAPF();
+		bool losesInfo;
+		tmp.convert(APFloatBase::IEEEdouble(), APFloat::roundingMode::rmNearestTiesToEven, &losesInfo);
+		const num_t k = static_cast<num_t>(tmp.convertToDouble());
 		return make_range(k, k);
 	}
 	const llvm::ConstantData* data = dyn_cast<llvm::ConstantData>(kval);
