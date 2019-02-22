@@ -100,7 +100,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		// retrieve info about function parameters
 		SmallVector<mdutils::MDInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
-		fun_arg_input[&f] = std::list<range_ptr_t>();
+		fun_arg_input[&f] = std::list<generic_range_ptr_t>();
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
 			// TODO: struct support
 			InputInfo *ii = dyn_cast<InputInfo>(*itII);
@@ -160,7 +160,7 @@ void ValueRangeAnalysis::processModule(Module &M)
 void ValueRangeAnalysis::processFunction(llvm::Function& F)
 {
 	// if already available, no need to execute again
-	range_ptr_t tmp = find_ret_val(&F);
+	generic_range_ptr_t tmp = find_ret_val(&F);
 	if (tmp != nullptr) {
 		return;
 	}
@@ -267,7 +267,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		else if (Instruction::isCast(opCode))
 		{
 			const llvm::Value* op = i.getOperand(0);
-			const auto info = fetchInfo(op);
+			const generic_range_ptr_t info = fetchInfo(op);
 			const auto res = handleCastInstruction(info, opCode);
 			saveValueInfo(&i, res);
 		}
@@ -275,8 +275,10 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		{
 			const llvm::Value* op1 = i.getOperand(0);
 			const llvm::Value* op2 = i.getOperand(1);
-			const auto info1 = fetchInfo(op1);
-			const auto info2 = fetchInfo(op2);
+			const auto node1 = getNode(op1);
+			const auto node2 = getNode(op2);
+			const range_ptr_t info1 = (node1) ? node1->getScalarRange() : nullptr;
+			const range_ptr_t info2 = (node2) ? node2->getScalarRange() : nullptr;
 			const auto res = handleBinaryInstruction(info1, info2, opCode);
 			saveValueInfo(&i, res);
 		}
@@ -284,13 +286,14 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		else if (Instruction::isUnaryOp(opCode))
 		{
 			const llvm::Value* op1 = i.getOperand(0);
-			const auto info1 = fetchInfo(op1);
+			const auto node = fetchInfo(op1);
+			const range_ptr_t info1 = (node1) ? node1->getScalarRange() : nullptr;
 			const auto res = handleUnaryInstruction(info1, opCode);
 			saveValueInfo(&i, res);
 		}
 #endif
 		else {
-			range_ptr_t tmp;
+			generic_range_ptr_t tmp;
 			switch (opCode) {
 				// memory operations
 				case llvm::Instruction::Alloca:
@@ -443,16 +446,26 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	// fetch function name
 	llvm::Function* callee = call_i->getCalledFunction();
 	const std::string calledFunctionName = callee->getName();
-	std::list<range_ptr_t> arg_ranges;
+
+	// fetch ranges of arguments
+	std::list<generic_range_ptr_t> arg_ranges;
+	std::list<range_ptr_t> arg_scalar_ranges;
 	for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
 	{
 		const llvm::Value* arg = *arg_it;
-		const range_ptr_t arg_info = fetchInfo(arg);
+		const generic_range_ptr_t arg_info = fetchInfo(arg);
+		const range_ptr_t arg_info_scalar = std::dynamic_pointer_cast<range_t>(arg_info);
+		if (arg_info_scalar) {
+			arg_scalar_ranges.push_back(arg_info_scalar);
+		}
 		arg_ranges.push_back(arg_info);
 	}
 
 	// first check if it is among the whitelisted functions we can handle
-	range_ptr_t res = handleMathCallInstruction(arg_ranges, calledFunctionName);
+	generic_range_ptr_t res = nullptr;
+	if (arg_scalar_ranges.size() == arg_ranges.size()) {
+		res = handleMathCallInstruction(arg_scalar_ranges, calledFunctionName);
+	}
 
 	if (res) {
 		saveValueInfo(call, res);
@@ -510,8 +523,8 @@ void ValueRangeAnalysis::handleReturn(const llvm::Instruction* ret)
 	}
 	const llvm::Value* ret_val = ret_i->getReturnValue();
 	const llvm::Function* ret_fun = ret_i->getFunction();
-	range_ptr_t range = fetchInfo(ret_val);
-	range_ptr_t partial = find_ret_val(ret_fun);
+	generic_range_ptr_t range = fetchInfo(ret_val);
+	generic_range_ptr_t partial = find_ret_val(ret_fun);
 	return_values[ret_fun] = getUnionRange(partial, range);
 	return;
 }
@@ -528,7 +541,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		if (II != nullptr) {
 			const auto range = fetchInfo(&v);
 			if (range != nullptr) {
-				II->IRange = new Range(range->min(), range->max());
+				// II->IRange = new Range(range->min(), range->max());
 				MDManager.setInputInfoMetadata(v, *II);
 			} else {
 				// TODO set default
@@ -547,7 +560,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 			if (range != nullptr) {
 				// TODO struct support
 				InputInfo *ii = cast<InputInfo>(*argsIt);
-				ii->IRange = new Range(range->min(), range->max());
+				// ii->IRange = new Range(range->min(), range->max());
 			} else {
 				// TODO set default
 			}
@@ -563,7 +576,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 				if (II != nullptr) {
 					const auto range = fetchInfo(&i);
 					if (range != nullptr) {
-						II->IRange = new Range(range->min(), range->max());
+						// II->IRange = new Range(range->min(), range->max());
 						MDManager.setInputInfoMetadata(i, *II);
 					} else {
 						// TODO set default
@@ -588,7 +601,7 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 	}
 	const llvm::Value* address_param = store_i->getPointerOperand();
 	const llvm::Value* value_param = store_i->getValueOperand();
-	const range_ptr_t range = fetchInfo(value_param);
+	const generic_range_ptr_t range = fetchInfo(value_param);
 	// TODO check for possible alias
 	memory[address_param] = range;
 	return;
@@ -597,7 +610,7 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 //-----------------------------------------------------------------------------
 // HANDLE MEMORY OPERATIONS
 //-----------------------------------------------------------------------------
-range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
+generic_range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
 {
 	const llvm::LoadInst* load_i = dyn_cast<llvm::LoadInst>(load);
 	if (!load_i) {
@@ -617,7 +630,7 @@ range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
 //-----------------------------------------------------------------------------
 // HANDLE PHI NODE
 //-----------------------------------------------------------------------------
-range_ptr_t ValueRangeAnalysis::handlePhiNode(const llvm::Instruction* phi)
+generic_range_ptr_t ValueRangeAnalysis::handlePhiNode(const llvm::Instruction* phi)
 {
 	const llvm::PHINode* phi_n = dyn_cast<llvm::PHINode>(phi);
 	if (!phi_n) {
@@ -628,10 +641,10 @@ range_ptr_t ValueRangeAnalysis::handlePhiNode(const llvm::Instruction* phi)
 		return nullptr;
 	}
 	const llvm::Value* op0 = phi_n->getIncomingValue(0);
-	range_ptr_t res = fetchInfo(op0);
+	generic_range_ptr_t res = fetchInfo(op0);
 	for (unsigned index = 1; index < phi_n->getNumIncomingValues(); index++) {
 		const llvm::Value* op = phi_n->getIncomingValue(index);
-		range_ptr_t op_range = fetchInfo(op);
+		generic_range_ptr_t op_range = fetchInfo(op);
 		res = getUnionRange(res, op_range);
 	}
 	return res;
@@ -651,23 +664,21 @@ range_ptr_t ValueRangeAnalysis::handleCmpInstr(const llvm::Instruction* cmp)
 	std::list<range_ptr_t> ranges;
 	for (unsigned index = 0; index < cmp_i->getNumOperands(); index++) {
 		const llvm::Value* op = cmp_i->getOperand(index);
-		range_ptr_t op_range = fetchInfo(op);
+		generic_range_ptr_t op_range = fetchInfo(op);
 		ranges.push_back(op_range);
 	}
-	range_ptr_t res = handleCompare(ranges, pred);
-	return res;
+	return handleCompare(ranges, pred);
 }
 
 //-----------------------------------------------------------------------------
 // FIND RETURN VALUE RANGE
 //-----------------------------------------------------------------------------
-range_ptr_t ValueRangeAnalysis::find_ret_val(const llvm::Function* f)
+generic_range_ptr_t ValueRangeAnalysis::find_ret_val(const llvm::Function* f)
 {
 	using iter_t = decltype(return_values)::const_iterator;
 	iter_t it = return_values.find(f);
 	if (it != return_values.end()) {
-		range_ptr_t tmp = it->second;
-		return tmp;
+		return it->second;
 	}
 	return nullptr;
 }
@@ -689,20 +700,27 @@ unsigned ValueRangeAnalysis::find_recursion_count(const llvm::Function* f)
 //-----------------------------------------------------------------------------
 // RETRIEVE INFO
 //-----------------------------------------------------------------------------
-const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
+const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 {
-	using iter_t = decltype(user_input)::const_iterator;
-	iter_t it = user_input.find(v);
-	if (it != user_input.end()) {
-		return it->second;
-	}
+	using iter_t = decltype(derived_ranges)::const_iterator;
+	iter_t it;
+	// it = user_input.find(v);
+	// if (it != user_input.end()) {
+	// 	return it->second;
+	// }
 	it = derived_ranges.find(v);
 	if (it != derived_ranges.end()) {
+		const auto node = it->second;
+		if (node->hasRange()) {
+			return node->getRange();
+		}
 		return it->second;
 	}
 	const llvm::Constant* const_i = dyn_cast<llvm::Constant>(v);
 	if (const_i) {
-		return fetchConstant(const_i);
+		generic_range_ptr_t k = fetchConstant(const_i);
+		saveValueInfo(v, k);
+		return k;
 	}
 	// no info available
 	return nullptr;
@@ -785,15 +803,80 @@ range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval)
 //-----------------------------------------------------------------------------
 // SAVE VALUE INFO
 //-----------------------------------------------------------------------------
-void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const range_ptr_t& info)
+void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info)
 {
 	using iter_t = decltype(derived_ranges)::const_iterator;
 	iter_t it = derived_ranges.find(v);
 	if (it != derived_ranges.end()) {
-		derived_ranges[v] = getUnionRange(it->second, info);
+		// set
+		const generic_range_ptr_t old = fetchRange(it->second);
+		setRange(it->second, getUnionRange(old, info), {});
+		// derived_ranges[v] = getUnionRange(it->second, info);
 		return;
 	}
-	derived_ranges[v] = info;
+	// TODO create
+	// derived_ranges[v] = info;
+	return;
+}
+
+VRA_RangeNode* ValueRangeAnalysis::getNode(const llvm::Value* v)
+{
+	using iter_t = decltype(derived_ranges)::const_iterator;
+	iter_t it = derived_ranges.find(v);
+	if (it != derived_ranges.end()) {
+		return it->second;
+	}
+	return nullptr;
+}
+
+generic_range_ptr_t ValueRangeAnalysis::fetchRange(const VRA_RangeNode* node, std::stack<unsigned>& offset)
+{
+	if (node->hasRange()) {
+		if (node->isScalar()) {
+			return node->getScalarRange();
+		} else {
+			range_s_ptr_t orig = node->getStructRange();
+			generic_range_ptr_t child = orig->getRangeAt(offset.top());
+			range_s_ptr_t parent = orig;
+			while (!offset.empty())
+			{
+				offset.pop();
+				parent = std::dynamic_pointer_cast<VRA_Structured_Range>(child);
+				child = parent->getRangeAt(offset.top());
+			}
+			return parent->getRangeAt(offset.top());
+		}
+	}
+	// recursively call parent to update its structure
+	offset.push(node->getOffset());
+	return fetchRange(getNode(node->getParent()), offset);
+}
+
+
+void ValueRangeAnalysis::setRange(VRA_RangeNode* node, const range_ptr_t& info, std::stack<unsigned>& offset)
+{
+	if (node->hasRange()) {
+		if (node->isScalar()) {
+			range_ptr_t old = node->getScalarRange();
+			range_ptr_t actual = getUnionRange(old, info);
+			node->setRange(actual);
+		} else {
+			range_s_ptr_t orig = node->getStructRange();
+			generic_range_ptr_t child = orig->getRangeAt(offset.top());
+			range_s_ptr_t parent = orig;
+			while (!offset.empty())
+			{
+				offset.pop();
+				parent = std::dynamic_pointer_cast<VRA_Structured_Range>(child);
+				child = parent->getRangeAt(offset.top());
+			}
+			parent->setRangeAt(offset.top(), info);
+		}
+		return;
+	}
+	// recursively call parent to update its structure
+	offset.push(node->getOffset());
+	setRange(getNode(node->getParent()), info, offset);
 	return;
 }
 

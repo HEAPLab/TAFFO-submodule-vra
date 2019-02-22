@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <limits>
 #include <map>
+#include <memory>
 
 using namespace taffo;
 
@@ -70,8 +71,8 @@ range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
 #endif
 
 /** Cast instructions */
-range_ptr_t taffo::handleCastInstruction(const range_ptr_t &op,
-                                         const unsigned OpCode)
+generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
+                                                 const unsigned OpCode)
 {
   switch (OpCode) {
 		case llvm::Instruction::Trunc: // TODO implement
@@ -124,8 +125,8 @@ range_ptr_t taffo::handleMathCallInstruction(const std::list<range_ptr_t>& ops,
 }
 
 /** Handle call to known math functions. Return nullptr if unknown */
-range_ptr_t taffo::handleCompare(const std::list<range_ptr_t>& ops,
-                                 const llvm::CmpInst::Predicate pred)
+generic_range_ptr_t taffo::handleCompare(const std::list<generic_range_ptr_t>& ops,
+                                         const llvm::CmpInst::Predicate pred)
 {
 	switch (pred) {
 		case llvm::CmpInst::Predicate::FCMP_FALSE:
@@ -141,8 +142,8 @@ range_ptr_t taffo::handleCompare(const std::list<range_ptr_t>& ops,
 	assert(ops.size() <= 2 && "too many operators in compare instruction");
 
 	// extract values for easy access
-	range_ptr_t lhs = ops.front();
-	range_ptr_t rhs = ops.back();
+	range_ptr_t lhs = std::reinterpret_pointer_cast<range_t>(ops.front());
+	range_ptr_t rhs = std::reinterpret_pointer_cast<range_t>(ops.back());
 	// if unavailable data, nothing can be said
 	if (!lhs || !rhs) {
 		return getGenericBoolRange();
@@ -305,24 +306,26 @@ range_ptr_t taffo::handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** CastToUInteger */
-range_ptr_t taffo::handleCastToUI(const range_ptr_t &op)
+generic_range_ptr_t taffo::handleCastToUI(const generic_range_ptr_t &op)
 {
-	if (!op) {
+	const range_ptr_t scalar = std::static_pointer_cast<VRA_Range<num_t>>(op);
+	if (!scalar) {
 		return nullptr;
 	}
-	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(op->min()));
-	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(op->max()));
+	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(scalar->min()));
+	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(scalar->max()));
 	return make_range(r1,r2);
 }
 
 /** CastToUInteger */
-range_ptr_t taffo::handleCastToSI(const range_ptr_t &op)
+generic_range_ptr_t taffo::handleCastToSI(const generic_range_ptr_t &op)
 {
-	if (!op) {
+	const range_ptr_t scalar = std::static_pointer_cast<VRA_Range<num_t>>(op);
+	if (!scalar) {
 		return nullptr;
 	}
-	const num_t r1 = static_cast<num_t>(static_cast<long>(op->min()));
-	const num_t r2 = static_cast<num_t>(static_cast<long>(op->max()));
+	const num_t r1 = static_cast<num_t>(static_cast<long>(scalar->min()));
+	const num_t r2 = static_cast<num_t>(static_cast<long>(scalar->max()));
 	return make_range(r1,r2);
 }
 
@@ -384,6 +387,13 @@ range_ptr_t taffo::copyRange(const range_ptr_t &op)
 	return res;
 }
 
+/** deep copy of range */
+generic_range_ptr_t taffo::copyRange(const generic_range_ptr_t& op)
+{
+	// TODO implement
+	return nullptr;
+}
+
 /** create a generic boolean range */
 range_ptr_t taffo::getGenericBoolRange()
 {
@@ -417,4 +427,16 @@ range_ptr_t taffo::getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2)
 	const num_t min = std::min({op1->min(), op2->min()});
 	const num_t max = std::max({op1->max(), op2->max()});
 	return make_range(min, max);
+}
+
+generic_range_ptr_t taffo::getUnionRange(const generic_range_ptr_t &op1, const generic_range_ptr_t &op2)
+{
+	if (!op1) {
+		return copyRange(op2);
+	}
+	if (!op2) {
+		return copyRange(op1);
+	}
+	// TODO implement
+	return nullptr;
 }

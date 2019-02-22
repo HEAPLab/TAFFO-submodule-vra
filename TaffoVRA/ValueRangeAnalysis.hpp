@@ -11,11 +11,13 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "Range.hpp"
+#include "RangeNode.hpp"
 
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <stack>
 
 #define DEBUG_TYPE "taffo-vra"
 #define DEBUG_VRA "ValueRangeAnalysis"
@@ -62,20 +64,26 @@ private:
 
 	inline void handleStoreInstr(const llvm::Instruction* store);
 
-	inline range_ptr_t handleLoadInstr(const llvm::Instruction* load);
+	inline generic_range_ptr_t handleLoadInstr(const llvm::Instruction* load);
 
 	inline range_ptr_t handleCmpInstr(const llvm::Instruction* cmp);
 
-	inline range_ptr_t handlePhiNode(const llvm::Instruction* phi);
+	inline generic_range_ptr_t handlePhiNode(const llvm::Instruction* phi);
 
-	inline range_ptr_t find_ret_val(const llvm::Function* f);
+	inline generic_range_ptr_t find_ret_val(const llvm::Function* f);
 
 	inline unsigned find_recursion_count(const llvm::Function* f);
 
 protected:
-	const range_ptr_t fetchInfo(const llvm::Value* v) const;
+	const generic_range_ptr_t fetchInfo(const llvm::Value* v) const;
 
-	void saveValueInfo(const llvm::Value* v, const range_ptr_t& info);
+	void saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info);
+
+	VRA_RangeNode* getNode(const llvm::Value* v);
+
+	generic_range_ptr_t fetchRange(const VRA_RangeNode* node, std::stack<unsigned>& offset);
+
+	void setRange(VRA_RangeNode* node, const range_ptr_t& info, std::stack<unsigned>& offset);
 
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
 
@@ -89,10 +97,11 @@ private:
 
 	// TODO find a better ID than pointer to llvm::Value. Value name?
 	llvm::DenseMap<const llvm::Value*, range_ptr_t> user_input;
-	llvm::DenseMap<const llvm::Value*, range_ptr_t> derived_ranges;
-	llvm::DenseMap<const llvm::Function*, std::list<range_ptr_t> > fun_arg_input;
-	llvm::DenseMap<const llvm::Function*, std::list<range_ptr_t> > fun_arg_derived;
-	llvm::DenseMap<const llvm::Value*, range_ptr_t> memory;
+	llvm::DenseMap<const llvm::Value*, VRA_RangeNode*> derived_ranges;
+	// llvm::DenseMap<const llvm::Value*, range_s_ptr_t> derived_struct_ranges;
+	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_input;
+	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_derived;
+	llvm::DenseMap<const llvm::Value*, generic_range_ptr_t> memory;
 	llvm::DenseMap<const llvm::Function*, unsigned> fun_rec_count;
 	llvm::DenseMap<const llvm::Loop*, unsigned> user_loop_iterations;
 	llvm::DenseMap<const llvm::Loop*, unsigned> derived_loop_iterations;
@@ -102,7 +111,7 @@ private:
 	std::unordered_map<std::string, llvm::Function*> known_functions;
 
 	std::vector<llvm::Function*> call_stack;
-	llvm::DenseMap<const llvm::Function*, range_ptr_t> return_values;
+	llvm::DenseMap<const llvm::Function*, generic_range_ptr_t> return_values;
 	// TODO return_values needs to be duplicated into partial and final to properly handle recursion
 
 };
