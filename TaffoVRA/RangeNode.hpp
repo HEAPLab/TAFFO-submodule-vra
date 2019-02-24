@@ -34,9 +34,14 @@ public:
 
 	inline bool hasRange() const {return _hasRange;}
 
-	inline bool isScalar() const {return hasRange() && std::dynamic_pointer_cast<range_t>(range) != nullptr;}
+	inline bool isScalar() const {
+		return hasRange() && std::dynamic_ptr_cast<range_t>(range) != nullptr;
+	}
 
-	inline bool isStruct() const {return hasRange() && std::dynamic_pointer_cast<VRA_Structured_Range>(range) != nullptr;}
+	inline bool isStruct() const {
+		return hasRange()
+			&& std::dynamic_ptr_cast<VRA_Structured_Range>(range) != nullptr;
+	}
 
 	inline void setScalarRange(const range_ptr_t& r) {
 		range = r;

@@ -83,7 +83,7 @@ protected:
 
 	generic_range_ptr_t fetchRange(const VRA_RangeNode* node, std::stack<unsigned>& offset);
 
-	void setRange(VRA_RangeNode* node, const range_ptr_t& info, std::stack<unsigned>& offset);
+	void setRange(VRA_RangeNode* node, const generic_range_ptr_t& info, std::stack<unsigned>& offset);
 
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
 
