@@ -63,7 +63,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 	for (const auto &v : M.globals()) {
 		// retrieve info about global var v, if any
 		InputInfo *II = MDManager.retrieveInputInfo(v);
-		if (II != nullptr && isValidRange(II->IRange)) {
+		if (II != nullptr && isValidRange(II->IRange.get())) {
 			const llvm::Value* v_ptr = &v;
 			user_input[v_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 		}
@@ -104,7 +104,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
 			// TODO: struct support
 			InputInfo *ii = dyn_cast<InputInfo>(*itII);
-			if (ii != nullptr && isValidRange(ii->IRange)) {
+			if (ii != nullptr && isValidRange(ii->IRange.get())) {
 				fun_arg_input[&f].push_back(make_range(ii->IRange->Min, ii->IRange->Max));
 			} else {
 				fun_arg_input[&f].push_back(nullptr);
@@ -116,7 +116,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 			for (const auto &i : bb.getInstList()) {
 				// fetch info about Instruction i, if any
 				InputInfo *II = MDManager.retrieveInputInfo(i);
-				if (II != nullptr && isValidRange(II->IRange)) {
+				if (II != nullptr && isValidRange(II->IRange.get())) {
 					const llvm::Value* i_ptr = &i;
           user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 				}
@@ -528,7 +528,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		if (II != nullptr) {
 			const auto range = fetchInfo(&v);
 			if (range != nullptr) {
-				II->IRange = new Range(range->min(), range->max());
+				II->IRange.reset(new Range(range->min(), range->max()));
 				MDManager.setInputInfoMetadata(v, *II);
 			} else {
 				// TODO set default
@@ -547,7 +547,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 			if (range != nullptr) {
 				// TODO struct support
 				InputInfo *ii = cast<InputInfo>(*argsIt);
-				ii->IRange = new Range(range->min(), range->max());
+				ii->IRange.reset(new Range(range->min(), range->max()));
 			} else {
 				// TODO set default
 			}
@@ -563,7 +563,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 				if (II != nullptr) {
 					const auto range = fetchInfo(&i);
 					if (range != nullptr) {
-						II->IRange = new Range(range->min(), range->max());
+						II->IRange.reset(new Range(range->min(), range->max()));
 						MDManager.setInputInfoMetadata(i, *II);
 					} else {
 						// TODO set default
