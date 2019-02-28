@@ -103,7 +103,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		fun_arg_input[&f] = std::list<range_ptr_t>();
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
 			// TODO: struct support
-			InputInfo *ii = dyn_cast<InputInfo>(*itII);
+			InputInfo *ii = dyn_cast_or_null<InputInfo>(*itII);
 			if (ii != nullptr && isValidRange(ii->IRange.get())) {
 				fun_arg_input[&f].push_back(make_range(ii->IRange->Min, ii->IRange->Max));
 			} else {
@@ -700,7 +700,7 @@ const range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 	if (it != derived_ranges.end()) {
 		return it->second;
 	}
-	const llvm::Constant* const_i = dyn_cast<llvm::Constant>(v);
+	const llvm::Constant* const_i = dyn_cast_or_null<llvm::Constant>(v);
 	if (const_i) {
 		return fetchConstant(const_i);
 	}
