@@ -483,7 +483,11 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		}
 		// fetch function return value
 		auto res_it = return_values.find(f);
-		res = res_it->second;
+		if (res_it != return_values.end()) {
+		  res = res_it->second;
+		} else {
+		  emitError("function " + calledFunctionName + " returns nothing");
+		}
 	} else {
 		const auto intrinsicsID = callee->getIntrinsicID();
 		if (intrinsicsID != llvm::Intrinsic::not_intrinsic) {
