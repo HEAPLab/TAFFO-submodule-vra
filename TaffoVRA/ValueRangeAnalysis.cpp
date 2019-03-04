@@ -63,7 +63,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 	for (const auto &v : M.globals()) {
 		// retrieve info about global var v, if any
 		InputInfo *II = MDManager.retrieveInputInfo(v);
-		if (II != nullptr && isValidRange(II->IRange)) {
+		if (II != nullptr && isValidRange(II->IRange.get())) {
 			const llvm::Value* v_ptr = &v;
 			user_input[v_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 		}
@@ -103,8 +103,8 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		fun_arg_input[&f] = std::list<generic_range_ptr_t>();
 		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
 			// TODO: struct support
-			InputInfo *ii = dyn_cast<InputInfo>(*itII);
-			if (ii != nullptr && isValidRange(ii->IRange)) {
+			InputInfo *ii = dyn_cast_or_null<InputInfo>(*itII);
+			if (ii != nullptr && isValidRange(ii->IRange.get())) {
 				fun_arg_input[&f].push_back(make_range(ii->IRange->Min, ii->IRange->Max));
 			} else {
 				fun_arg_input[&f].push_back(nullptr);
@@ -116,7 +116,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 			for (const auto &i : bb.getInstList()) {
 				// fetch info about Instruction i, if any
 				InputInfo *II = MDManager.retrieveInputInfo(i);
-				if (II != nullptr && isValidRange(II->IRange)) {
+				if (II != nullptr && isValidRange(II->IRange.get())) {
 					const llvm::Value* i_ptr = &i;
           user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 				}
@@ -719,7 +719,7 @@ const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) co
 			return nullptr;
 		}
 	}
-	const llvm::Constant* const_i = dyn_cast<llvm::Constant>(v);
+	const llvm::Constant* const_i = dyn_cast_or_null<llvm::Constant>(v);
 	if (const_i) {
 		generic_range_ptr_t k = fetchConstant(const_i);
 		// // commented out to avoid const loss for this method
