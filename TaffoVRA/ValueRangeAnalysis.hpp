@@ -62,7 +62,7 @@ private:
 
 	inline void handleStoreInstr(const llvm::Instruction* store);
 
-	inline range_ptr_t handleLoadInstr(const llvm::Instruction* load);
+	inline range_ptr_t handleLoadInstr(llvm::Instruction* load);
 
 	inline range_ptr_t handleCmpInstr(const llvm::Instruction* cmp);
 

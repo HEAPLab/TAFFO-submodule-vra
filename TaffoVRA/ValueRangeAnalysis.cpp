@@ -2,6 +2,7 @@
 #include "InputInfo.h"
 #include "RangeOperations.hpp"
 #include "Metadata.h"
+#include "MemSSAUtils.hpp"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
@@ -593,29 +594,36 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 	const llvm::Value* address_param = store_i->getPointerOperand();
 	const llvm::Value* value_param = store_i->getValueOperand();
 	const range_ptr_t range = fetchInfo(value_param);
-	// TODO check for possible alias
 	memory[address_param] = range;
+	memory[store_i] = range;
 	return;
 }
 
 //-----------------------------------------------------------------------------
 // HANDLE MEMORY OPERATIONS
 //-----------------------------------------------------------------------------
-range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
+range_ptr_t ValueRangeAnalysis::handleLoadInstr(llvm::Instruction* load)
 {
-	const llvm::LoadInst* load_i = dyn_cast<llvm::LoadInst>(load);
+	llvm::LoadInst* load_i = dyn_cast<llvm::LoadInst>(load);
 	if (!load_i) {
 		emitError("Could not convert load instruction to LoadInst");
 		return nullptr;
 	}
-	const llvm::Value* address_param = load_i->getPointerOperand();
-	// TODO check for possible alias
-	using const_it = decltype(memory)::const_iterator;
-	const_it it = memory.find(address_param);
-	if (it != memory.end()) {
-		return it->second;
+	MemorySSA& memssa = getAnalysis<MemorySSAWrapperPass>(*load->getFunction()).getMSSA();
+	MemSSAUtils memssa_utils(memssa);
+	SmallVectorImpl<Value*>& def_vals = memssa_utils.getDefiningValues(load_i);
+
+	range_ptr_t res = nullptr;
+	for (Value *dval : def_vals) {
+	  using const_it = decltype(memory)::const_iterator;
+	  const_it it = memory.find(dval);
+	  if (it != memory.end()) {
+	    res = getUnionRange(res, it->second);
+	  } else {
+	    res = getUnionRange(res, fetchInfo(dval));
+	  }
 	}
-	return nullptr;
+	return res;
 }
 
 //-----------------------------------------------------------------------------

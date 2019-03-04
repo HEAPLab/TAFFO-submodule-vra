@@ -6,6 +6,8 @@ add_llvm_loadable_module(TaffoVRA
   Range.hpp
   ValueRangeAnalysis.cpp
   ValueRangeAnalysis.hpp
+  MemSSAUtils.cpp
+  MemSSAUtils.hpp
 
   PLUGIN_TOOL
   opt
