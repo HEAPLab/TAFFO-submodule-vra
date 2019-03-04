@@ -18,6 +18,7 @@
 #include <unordered_map>
 #include <vector>
 #include <stack>
+#include <InputInfo.h>
 
 #define DEBUG_TYPE "taffo-vra"
 #define DEBUG_VRA "ValueRangeAnalysis"
@@ -37,6 +38,8 @@ public:
 	// methods
 private:
 	void harvestMetadata(llvm::Module &M);
+
+	generic_range_ptr_t harvestStructMD(mdutils::MDInfo *MD);
 
 	void processModule(llvm::Module &M);
 
@@ -96,7 +99,7 @@ private:
 	const unsigned default_function_recursion_count = 0;
 
 	// TODO find a better ID than pointer to llvm::Value. Value name?
-	llvm::DenseMap<const llvm::Value*, range_ptr_t> user_input;
+	llvm::DenseMap<const llvm::Value*, generic_range_ptr_t> user_input;
 	llvm::DenseMap<const llvm::Value*, VRA_RangeNode*> derived_ranges;
 	// llvm::DenseMap<const llvm::Value*, range_s_ptr_t> derived_struct_ranges;
 	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_input;

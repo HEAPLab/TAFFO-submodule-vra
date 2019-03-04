@@ -120,12 +120,37 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 					const llvm::Value* i_ptr = &i;
           user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 				}
+				else if (StructInfo *SI = MDManager.retrieveStructInfo(i)) {
+					const llvm::Value* i_ptr = &i;
+					user_input[i_ptr] = harvestStructMD(SI);
+				}
 			}
 		}
 
 	} // end iteration over Function in Module
 	return;
 }
+
+generic_range_ptr_t ValueRangeAnalysis::harvestStructMD(MDInfo *MD) {
+	if (MD == nullptr) {
+		return make_range();
+
+	} else if (InputInfo *II = dyn_cast<InputInfo>(MD)) {
+		if (isValidRange(II->IRange.get()))
+			return make_range(II->IRange->Min, II->IRange->Max);
+
+	} else if (StructInfo *SI = dyn_cast<StructInfo>(MD)) {
+		std::vector<generic_range_ptr_t> rngs;
+		for (auto it = SI->begin(); it != SI->end(); it++) {
+			rngs.push_back(harvestStructMD(it->get()));
+		}
+
+		return make_s_range(rngs);
+	}
+
+	assert("unknown type of MDInfo");
+}
+
 
 //-----------------------------------------------------------------------------
 // ACTUAL PROCESSING
@@ -452,8 +477,9 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	std::list<range_ptr_t> arg_scalar_ranges;
 	for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
 	{
-		const llvm::Value* arg = *arg_it;
-		const generic_range_ptr_t arg_info = fetchInfo(arg);
+		const generic_range_ptr_t arg_info = fetchInfo(*arg_it);
+		if (!arg_info)
+			continue;
 		const range_ptr_t arg_info_scalar = std::dynamic_ptr_cast<range_t>(arg_info);
 		if (arg_info_scalar) {
 			arg_scalar_ranges.push_back(arg_info_scalar);
@@ -607,9 +633,6 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 	return;
 }
 
-//-----------------------------------------------------------------------------
-// HANDLE MEMORY OPERATIONS
-//-----------------------------------------------------------------------------
 generic_range_ptr_t ValueRangeAnalysis::handleLoadInstr(const llvm::Instruction* load)
 {
 	const llvm::LoadInst* load_i = dyn_cast<llvm::LoadInst>(load);

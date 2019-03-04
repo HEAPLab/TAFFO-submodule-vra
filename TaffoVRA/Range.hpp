@@ -108,6 +108,10 @@ public:
 	{
 		_ranges = {r};
 	}
+	VRA_Structured_Range(std::vector<generic_range_ptr_t>& rhs)
+	: VRA_Generic_Range(kind_structured),
+	_ranges(rhs)
+	{}
 	VRA_Structured_Range(const VRA_Structured_Range& rhs)
 	: VRA_Generic_Range(kind_structured),
 	_ranges(rhs.ranges())
