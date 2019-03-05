@@ -80,6 +80,10 @@ protected:
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
 
 	static void emitError(const std::string& message);
+        static void logInstruction(const llvm::Value* v);
+        static void logRange(const range_ptr_t& range);
+        static void logInfo(const llvm::StringRef info);
+        static void logError(const llvm::StringRef error);
 
 	// data structures
 private:

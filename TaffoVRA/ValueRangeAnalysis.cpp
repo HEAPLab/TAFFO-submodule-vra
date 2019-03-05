@@ -160,9 +160,11 @@ void ValueRangeAnalysis::processModule(Module &M)
 
 void ValueRangeAnalysis::processFunction(llvm::Function& F)
 {
+        DEBUG(dbgs() << "\nProcessing function " << F.getName() << "...\n");
 	// if already available, no need to execute again
 	range_ptr_t tmp = find_ret_val(&F);
 	if (tmp != nullptr) {
+	        DEBUG(dbgs() << " done already, aborting.\n");
 		return;
 	}
 
@@ -246,6 +248,9 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	call_stack.pop_back();
 	f_unvisited_set.erase(&F);
 	// TODO keep a range for possible return value
+
+	DEBUG(dbgs() << "[TAFFO][VRA] Finished processing function "
+	      << F.getName() << ".\n\n");
 	return;
 }
 
@@ -274,20 +279,29 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		}
 		else if (Instruction::isBinaryOp(opCode))
 		{
+		        logInstruction(&i);
 			const llvm::Value* op1 = i.getOperand(0);
 			const llvm::Value* op2 = i.getOperand(1);
 			const auto info1 = fetchInfo(op1);
 			const auto info2 = fetchInfo(op2);
 			const auto res = handleBinaryInstruction(info1, info2, opCode);
 			saveValueInfo(&i, res);
+
+			DEBUG(if (!info1) logInfo("first range is null"));
+			DEBUG(if (!info2) logInfo("second range is null"));
+			logRange(res);
 		}
 #if LLVM_VERSION > 7
 		else if (Instruction::isUnaryOp(opCode))
 		{
+			logInstruction(&i);
 			const llvm::Value* op1 = i.getOperand(0);
 			const auto info1 = fetchInfo(op1);
 			const auto res = handleUnaryInstruction(info1, opCode);
 			saveValueInfo(&i, res);
+
+			DEBUG(if (!info1) logInfo("operand range is null"));
+			logRange(res);
 		}
 #endif
 		else {
@@ -441,6 +455,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		emitError("Cannot cast a call instruction to llvm::CallBase");
 		return;
 	}
+	logInstruction(call);
 	// fetch function name
 	llvm::Function* callee = call_i->getCalledFunction();
 	const std::string calledFunctionName = callee->getName();
@@ -457,6 +472,8 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 
 	if (res) {
 		saveValueInfo(call, res);
+		logInfo("whitelisted");
+		logRange(res);
 		return;
 	}
 
@@ -477,17 +494,20 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		if (call_count <= find_recursion_count(f)) {
 			// Can process
 			// update parameter metadata
+		        DEBUG(dbgs() << "processing function...\n");
 			fun_arg_derived[f] = arg_ranges;
 			processFunction(*f);
+			DEBUG(dbgs() << "[TAFFO][VRA] Finished processing call "
+			      << *call << " : ");
 		} else {
-			emitError("Exceeding recursion count - skip call");
+			logError("Exceeding recursion count - skip call");
 		}
 		// fetch function return value
 		auto res_it = return_values.find(f);
 		if (res_it != return_values.end()) {
 		  res = res_it->second;
 		} else {
-		  emitError("function " + calledFunctionName + " returns nothing");
+		  logError("function " + calledFunctionName + " returns nothing");
 		}
 	} else {
 		const auto intrinsicsID = callee->getIntrinsicID();
@@ -500,6 +520,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		}
 	}
 	saveValueInfo(call, res);
+	logRange(res);
 	return;
 }
 
@@ -513,11 +534,13 @@ void ValueRangeAnalysis::handleReturn(const llvm::Instruction* ret)
 		emitError("Could not convert Return Instruction to llvm::ReturnInstr");
 		return;
 	}
+	logInstruction(ret);
 	const llvm::Value* ret_val = ret_i->getReturnValue();
 	const llvm::Function* ret_fun = ret_i->getFunction();
 	range_ptr_t range = fetchInfo(ret_val);
 	range_ptr_t partial = find_ret_val(ret_fun);
 	return_values[ret_fun] = getUnionRange(partial, range);
+	logRange(return_values[ret_fun]);
 	return;
 }
 
@@ -591,11 +614,13 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 		emitError("Could not convert store instruction to StoreInst");
 		return;
 	}
+	logInstruction(store);
 	const llvm::Value* address_param = store_i->getPointerOperand();
 	const llvm::Value* value_param = store_i->getValueOperand();
 	const range_ptr_t range = fetchInfo(value_param);
 	memory[address_param] = range;
 	memory[store_i] = range;
+	logRange(range);
 	return;
 }
 
@@ -609,6 +634,7 @@ range_ptr_t ValueRangeAnalysis::handleLoadInstr(llvm::Instruction* load)
 		emitError("Could not convert load instruction to LoadInst");
 		return nullptr;
 	}
+	logInstruction(load);
 	MemorySSA& memssa = getAnalysis<MemorySSAWrapperPass>(*load->getFunction()).getMSSA();
 	MemSSAUtils memssa_utils(memssa);
 	SmallVectorImpl<Value*>& def_vals = memssa_utils.getDefiningValues(load_i);
@@ -623,6 +649,7 @@ range_ptr_t ValueRangeAnalysis::handleLoadInstr(llvm::Instruction* load)
 	    res = getUnionRange(res, fetchInfo(dval));
 	  }
 	}
+	logRange(res);
 	return res;
 }
 
@@ -633,12 +660,13 @@ range_ptr_t ValueRangeAnalysis::handlePhiNode(const llvm::Instruction* phi)
 {
 	const llvm::PHINode* phi_n = dyn_cast<llvm::PHINode>(phi);
 	if (!phi_n) {
-		emitError("Could not convert Compare instruction to CmpInst");
+		emitError("Could not convert Phi instruction to PHINode");
 		return nullptr;
 	}
 	if (phi_n->getNumIncomingValues() < 1) {
 		return nullptr;
 	}
+	logInstruction(phi);
 	const llvm::Value* op0 = phi_n->getIncomingValue(0);
 	range_ptr_t res = fetchInfo(op0);
 	for (unsigned index = 1; index < phi_n->getNumIncomingValues(); index++) {
@@ -646,6 +674,7 @@ range_ptr_t ValueRangeAnalysis::handlePhiNode(const llvm::Instruction* phi)
 		range_ptr_t op_range = fetchInfo(op);
 		res = getUnionRange(res, op_range);
 	}
+	logRange(res);
 	return res;
 }
 
@@ -659,6 +688,7 @@ range_ptr_t ValueRangeAnalysis::handleCmpInstr(const llvm::Instruction* cmp)
 		emitError("Could not convert Compare instruction to CmpInst");
 		return nullptr;
 	}
+	logInstruction(cmp);
 	const llvm::CmpInst::Predicate pred = cmp_i->getPredicate();
 	std::list<range_ptr_t> ranges;
 	for (unsigned index = 0; index < cmp_i->getNumOperands(); index++) {
@@ -667,6 +697,7 @@ range_ptr_t ValueRangeAnalysis::handleCmpInstr(const llvm::Instruction* cmp)
 		ranges.push_back(op_range);
 	}
 	range_ptr_t res = handleCompare(ranges, pred);
+	logRange(res);
 	return res;
 }
 
@@ -819,4 +850,28 @@ void ValueRangeAnalysis::emitError(const std::string& message)
 {
 	llvm::dbgs() << "[TAFFO] Value Range Analysis: " << message << "\n";
 	return;
+}
+
+void ValueRangeAnalysis::logInstruction(const llvm::Value* v)
+{
+        assert(v != nullptr);
+        DEBUG(dbgs() << "[TAFFO][VRA]" << *v << " : ");
+}
+
+void ValueRangeAnalysis::logRange(const range_ptr_t& range)
+{
+        if (range != nullptr)
+	  DEBUG(dbgs() << "[" << range->min() << ", " << range->max() << "]\n");
+	else
+	  DEBUG(dbgs() << "null range!\n");
+}
+
+void ValueRangeAnalysis::logInfo(const llvm::StringRef info)
+{
+        DEBUG(dbgs() << "(" << info << ") ");
+}
+
+void ValueRangeAnalysis::logError(const llvm::StringRef error)
+{
+        DEBUG(dbgs() << error << "\n");
 }
