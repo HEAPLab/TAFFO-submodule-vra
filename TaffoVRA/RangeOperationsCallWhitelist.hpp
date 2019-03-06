@@ -8,6 +8,11 @@
 
 namespace taffo {
 
+#define CMATH_WHITELIST_FUN(BASE_NAME, POINTER) \
+	{BASE_NAME,     POINTER}, \
+	{BASE_NAME "f", POINTER}, \
+	{BASE_NAME "l", POINTER}
+
 using map_value_t = range_ptr_t(*)(const std::list<range_ptr_t>&);
 const std::map<const std::string, map_value_t> functionWhiteList;
 };

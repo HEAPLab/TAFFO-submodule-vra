@@ -142,16 +142,16 @@ static range_ptr_t handleCallToTanh(const std::list<range_ptr_t>& operands)
 
 const std::map<const std::string, map_value_t> functionWhiteList =
 {
-	{"ceil",  &handleCallToCeil},
-	{"floor", &handleCallToFloor},
-	{"fabs",  &handleCallToFabs},
-	{"log",   &handleCallToLog},
-	{"log10", &handleCallToLog10},
-	{"log2f", &handleCallToLog2f},
-	{"sqrt",  &handleCallToSqrt},
-	{"exp",   &handleCallToExp},
-	{"sin",   &handleCallToSin},
-	{"cos",   &handleCallToCos},
-	{"acos",  &handleCallToAcos},
-	{"tanh",  &handleCallToTanh},
+	CMATH_WHITELIST_FUN("ceil",  &handleCallToCeil),
+	CMATH_WHITELIST_FUN("floor", &handleCallToFloor),
+	CMATH_WHITELIST_FUN("fabs",  &handleCallToFabs),
+	CMATH_WHITELIST_FUN("log",   &handleCallToLog),
+	CMATH_WHITELIST_FUN("log10", &handleCallToLog10),
+	CMATH_WHITELIST_FUN("log2",  &handleCallToLog2f),
+	CMATH_WHITELIST_FUN("sqrt",  &handleCallToSqrt),
+	CMATH_WHITELIST_FUN("exp",   &handleCallToExp),
+	CMATH_WHITELIST_FUN("sin",   &handleCallToSin),
+	CMATH_WHITELIST_FUN("cos",   &handleCallToCos),
+	CMATH_WHITELIST_FUN("acos",  &handleCallToAcos),
+	CMATH_WHITELIST_FUN("tanh",  &handleCallToTanh),
 };
