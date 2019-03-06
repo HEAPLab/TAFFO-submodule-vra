@@ -140,7 +140,7 @@ static range_ptr_t handleCallToTanh(const std::list<range_ptr_t>& operands)
 	return nullptr;
 }
 
-const std::map<const std::string, map_value_t> functionWhiteList =
+const std::map<const std::string, map_value_t> taffo::functionWhiteList =
 {
 	CMATH_WHITELIST_FUN("ceil",  &handleCallToCeil),
 	CMATH_WHITELIST_FUN("floor", &handleCallToFloor),

@@ -188,7 +188,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 				param_info_it++;
 				param_val_it++;
 			}
-			DEBUG(dbgs() << "}\n");
+			DEBUG(dbgs() << "\n");
 		}
 	} else {
 		// save input info
@@ -206,7 +206,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 			param_info_it++;
 			param_val_it++;
 		}
-		DEBUG(dbgs() << "}\n");
+		DEBUG(dbgs() << "\n");
 	}
 
 	// update stack for the simulation of execution
