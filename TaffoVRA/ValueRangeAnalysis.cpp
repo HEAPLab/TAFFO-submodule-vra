@@ -210,6 +210,9 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	}
 	llvm::BasicBlock* current_bb = &F.getEntryBlock();
 
+	// TODO: maybe we should make a local copy of bb_priority,
+	// for when the same function is analyzed multiple times
+	// (e.g. recursion, multiple calls with different arguments...)
 	while(current_bb != nullptr)
 	{
 		processBasicBlock(*current_bb);
@@ -223,11 +226,14 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 			bb_queue.insert(unique_successor);
 		} else {
 			auto successors = llvm::successors(current_bb);
-			for (auto successor : successors) {
-				llvm::BasicBlock* succ = successor;
-				if (bb_priority[succ] > 0) {
+			for (llvm::BasicBlock* succ : successors) {
+			  	auto succ_pri = bb_priority.find(succ);
+				if (succ_pri == bb_priority.end()) {
 					bb_queue.insert(succ);
-					bb_priority[succ] -= bb_base_priority;
+					bb_priority[succ] = 0;
+				} else if (succ_pri->second > 0) {
+					bb_queue.insert(succ);
+				        succ_pri->second -= bb_base_priority;
 				}
 			}
 		}
@@ -249,8 +255,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	f_unvisited_set.erase(&F);
 	// TODO keep a range for possible return value
 
-	DEBUG(dbgs() << "[TAFFO][VRA] Finished processing function "
-	      << F.getName() << ".\n\n");
+	DEBUG(dbgs() << "[TAFFO][VRA] Finished processing function " << F.getName() << ".\n\n");
 	return;
 }
 
