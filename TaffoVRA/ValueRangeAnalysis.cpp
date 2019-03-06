@@ -160,7 +160,7 @@ void ValueRangeAnalysis::processModule(Module &M)
 
 void ValueRangeAnalysis::processFunction(llvm::Function& F)
 {
-        DEBUG(dbgs() << "\nProcessing function " << F.getName() << "...\n");
+        DEBUG(dbgs() << "\n" DEBUG_HEAD " Processing function " << F.getName() << "...\n");
 	// if already available, no need to execute again
 	range_ptr_t tmp = find_ret_val(&F);
 	if (tmp != nullptr) {
@@ -174,27 +174,39 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 		param_lookup_it = fun_arg_derived.find(&F);
 		if (param_lookup_it != fun_arg_derived.end()) {
 			// save derived info
+		  	DEBUG(dbgs() << DEBUG_HEAD " Loading derived arguments: ");
 			auto param_val_it = F.arg_begin();
 			auto param_info_it = param_lookup_it->second.begin();
 			while (param_val_it != F.arg_end()) {
 				llvm::Argument* arg_ptr = param_val_it;
 				llvm::Value* arg_val = dyn_cast<llvm::Value>(arg_ptr);
 				saveValueInfo(arg_val, *param_info_it);
+
+				DEBUG(dbgs() << "{ " << *arg_ptr << " : "
+				      << to_string(*param_info_it) << " }, ");
+
 				param_info_it++;
 				param_val_it++;
 			}
+			DEBUG(dbgs() << "}\n");
 		}
 	} else {
 		// save input info
+	  	DEBUG(dbgs() << DEBUG_HEAD " Loading metadata arguments: ");
 		auto param_val_it = F.arg_begin();
 		auto param_info_it = param_lookup_it->second.begin();
 		while (param_val_it != F.arg_end()) {
 			llvm::Argument* arg_ptr = param_val_it;
 			llvm::Value* arg_val = dyn_cast<llvm::Value>(arg_ptr);
 			saveValueInfo(arg_val, *param_info_it);
+
+			DEBUG(dbgs() << "{ " << *arg_ptr << " : "
+			      << to_string(*param_info_it) << " }, ");
+
 			param_info_it++;
 			param_val_it++;
 		}
+		DEBUG(dbgs() << "}\n");
 	}
 
 	// update stack for the simulation of execution
@@ -284,7 +296,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			saveValueInfo(&i, res);
 
 			DEBUG(if (!info) logInfo("operand range is null"));
-			logRange(res);
+			logRangeln(res);
 		}
 		else if (Instruction::isBinaryOp(opCode))
 		{
@@ -298,7 +310,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 
 			DEBUG(if (!info1) logInfo("first range is null"));
 			DEBUG(if (!info2) logInfo("second range is null"));
-			logRange(res);
+			logRangeln(res);
 		}
 #if LLVM_VERSION > 7
 		else if (Instruction::isUnaryOp(opCode))
@@ -310,7 +322,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			saveValueInfo(&i, res);
 
 			DEBUG(if (!info1) logInfo("operand range is null"));
-			logRange(res);
+			logRangeln(res);
 		}
 #endif
 		else {
@@ -482,7 +494,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	if (res) {
 		saveValueInfo(call, res);
 		logInfo("whitelisted");
-		logRange(res);
+		logRangeln(res);
 		return;
 	}
 
@@ -529,7 +541,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		}
 	}
 	saveValueInfo(call, res);
-	logRange(res);
+	logRangeln(res);
 	return;
 }
 
@@ -549,7 +561,7 @@ void ValueRangeAnalysis::handleReturn(const llvm::Instruction* ret)
 	range_ptr_t range = fetchInfo(ret_val);
 	range_ptr_t partial = find_ret_val(ret_fun);
 	return_values[ret_fun] = getUnionRange(partial, range);
-	logRange(return_values[ret_fun]);
+	logRangeln(return_values[ret_fun]);
 	return;
 }
 
@@ -629,7 +641,7 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 	const range_ptr_t range = fetchInfo(value_param);
 	memory[address_param] = range;
 	memory[store_i] = range;
-	logRange(range);
+	logRangeln(range);
 	return;
 }
 
@@ -658,7 +670,7 @@ range_ptr_t ValueRangeAnalysis::handleLoadInstr(llvm::Instruction* load)
 	    res = getUnionRange(res, fetchInfo(dval));
 	  }
 	}
-	logRange(res);
+	logRangeln(res);
 	return res;
 }
 
@@ -683,7 +695,7 @@ range_ptr_t ValueRangeAnalysis::handlePhiNode(const llvm::Instruction* phi)
 		range_ptr_t op_range = fetchInfo(op);
 		res = getUnionRange(res, op_range);
 	}
-	logRange(res);
+	logRangeln(res);
 	return res;
 }
 
@@ -706,7 +718,7 @@ range_ptr_t ValueRangeAnalysis::handleCmpInstr(const llvm::Instruction* cmp)
 		ranges.push_back(op_range);
 	}
 	range_ptr_t res = handleCompare(ranges, pred);
-	logRange(res);
+	logRangeln(res);
 	return res;
 }
 
@@ -864,15 +876,21 @@ void ValueRangeAnalysis::emitError(const std::string& message)
 void ValueRangeAnalysis::logInstruction(const llvm::Value* v)
 {
         assert(v != nullptr);
-        DEBUG(dbgs() << "[TAFFO][VRA]" << *v << " : ");
+        DEBUG(dbgs() << DEBUG_HEAD << *v << " : ");
 }
 
-void ValueRangeAnalysis::logRange(const range_ptr_t& range)
+std::string ValueRangeAnalysis::to_string(const range_ptr_t& range)
 {
         if (range != nullptr)
-	  DEBUG(dbgs() << "[" << range->min() << ", " << range->max() << "]\n");
+	  return "[" + std::to_string(range->min()) + ", "
+	    + std::to_string(range->max()) + "]";
 	else
-	  DEBUG(dbgs() << "null range!\n");
+	  return "null range!";
+}
+
+void ValueRangeAnalysis::logRangeln(const range_ptr_t& range)
+{
+	DEBUG(dbgs() << to_string(range) << "\n");
 }
 
 void ValueRangeAnalysis::logInfo(const llvm::StringRef info)
