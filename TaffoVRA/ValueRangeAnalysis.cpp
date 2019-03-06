@@ -272,10 +272,14 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		}
 		else if (Instruction::isCast(opCode))
 		{
-			const llvm::Value* op = i.getOperand(0);
+			logInstruction(&i);
+		        const llvm::Value* op = i.getOperand(0);
 			const auto info = fetchInfo(op);
 			const auto res = handleCastInstruction(info, opCode);
 			saveValueInfo(&i, res);
+
+			DEBUG(if (!info) logInfo("operand range is null"));
+			logRange(res);
 		}
 		else if (Instruction::isBinaryOp(opCode))
 		{
