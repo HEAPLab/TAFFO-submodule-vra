@@ -726,20 +726,18 @@ unsigned ValueRangeAnalysis::find_recursion_count(const llvm::Function* f)
 //-----------------------------------------------------------------------------
 const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) const
 {
-	using iter_t = decltype(derived_ranges)::const_iterator;
-	iter_t it;
-	// it = user_input.find(v);
-	// if (it != user_input.end()) {
-	// 	return it->second;
-	// }
-	it = derived_ranges.find(v);
-	if (it != derived_ranges.end()) {
-		const auto node = it->second;
+	auto input_it = user_input.find(v);
+	if (input_it != user_input.end()) {
+	 	return input_it->second;
+	}
+
+  if (const auto node = getNode(v)) {
 		if (node->hasRange()) {
 			return node->getRange();
 		} else {
-			// TODO fetch info in hierachical structure
-			return nullptr;
+      std::stack<unsigned> offset;
+			offset.push(node->getOffset());
+			return fetchInfo(node->getParent(), offset);
 		}
 	}
 	const llvm::Constant* const_i = dyn_cast_or_null<llvm::Constant>(v);
@@ -751,6 +749,21 @@ const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v) co
 	}
 	// no info available
 	return nullptr;
+}
+
+const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v, std::stack<unsigned>& offset) const
+{
+  //fetch info in hierachical structure
+  if (const auto node = getNode(v)) {
+    if (node->hasRange()) {
+      return fetchRange(node,offset);
+    } else {
+      offset.push(node->getOffset());
+      return fetchInfo(node->getParent(), offset);
+    }
+  }
+
+  return nullptr;
 }
 
 //-----------------------------------------------------------------------------
@@ -835,23 +848,21 @@ range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval)
 //-----------------------------------------------------------------------------
 void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info)
 {
-	using iter_t = decltype(derived_ranges)::const_iterator;
-	iter_t it = derived_ranges.find(v);
-	if (it != derived_ranges.end()) {
+  if (const auto node = getNode(v)) {
 		// set
 		std::stack<unsigned> offset;
-		const generic_range_ptr_t old = fetchRange(it->second, offset);
+		const generic_range_ptr_t old = fetchRange(node, offset);
 		const generic_range_ptr_t updated = getUnionRange(old, info);
-		setRange(it->second, updated, offset);
+		setRange(node, updated, offset);
 		// derived_ranges[v] = getUnionRange(it->second, info);
 		return;
 	}
-	// TODO create
-	// derived_ranges[v] = info;
+	
+	derived_ranges[v] = new VRA_RangeNode(info);
 	return;
 }
 
-VRA_RangeNode* ValueRangeAnalysis::getNode(const llvm::Value* v)
+VRA_RangeNode* ValueRangeAnalysis::getNode(const llvm::Value* v) const
 {
 	using iter_t = decltype(derived_ranges)::const_iterator;
 	iter_t it = derived_ranges.find(v);
@@ -861,7 +872,7 @@ VRA_RangeNode* ValueRangeAnalysis::getNode(const llvm::Value* v)
 	return nullptr;
 }
 
-generic_range_ptr_t ValueRangeAnalysis::fetchRange(const VRA_RangeNode* node, std::stack<unsigned>& offset)
+generic_range_ptr_t ValueRangeAnalysis::fetchRange(const VRA_RangeNode* node, std::stack<unsigned>& offset) const
 {
 	if (node->hasRange()) {
 		if (node->isScalar()) {
@@ -876,6 +887,7 @@ generic_range_ptr_t ValueRangeAnalysis::fetchRange(const VRA_RangeNode* node, st
 				parent = std::dynamic_ptr_cast<VRA_Structured_Range>(child);
 				child = parent->getRangeAt(offset.top());
 			}
+			//TODO offset.top == nullptr ?
 			return parent->getRangeAt(offset.top());
 		}
 	}

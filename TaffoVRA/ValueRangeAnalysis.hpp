@@ -80,11 +80,13 @@ private:
 protected:
 	const generic_range_ptr_t fetchInfo(const llvm::Value* v) const;
 
+	const generic_range_ptr_t fetchInfo(const llvm::Value* v, std::stack<unsigned>& offset) const;
+
 	void saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info);
 
-	VRA_RangeNode* getNode(const llvm::Value* v);
+	VRA_RangeNode* getNode(const llvm::Value* v) const;
 
-	generic_range_ptr_t fetchRange(const VRA_RangeNode* node, std::stack<unsigned>& offset);
+	generic_range_ptr_t fetchRange(const VRA_RangeNode* node, std::stack<unsigned>& offset) const;
 
 	void setRange(VRA_RangeNode* node, const generic_range_ptr_t& info, std::stack<unsigned>& offset);
 
@@ -101,7 +103,6 @@ private:
 	// TODO find a better ID than pointer to llvm::Value. Value name?
 	llvm::DenseMap<const llvm::Value*, generic_range_ptr_t> user_input;
 	llvm::DenseMap<const llvm::Value*, VRA_RangeNode*> derived_ranges;
-	// llvm::DenseMap<const llvm::Value*, range_s_ptr_t> derived_struct_ranges;
 	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_input;
 	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_derived;
 	llvm::DenseMap<const llvm::Value*, generic_range_ptr_t> memory;
