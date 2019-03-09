@@ -292,7 +292,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			logInstruction(&i);
 		        const llvm::Value* op = i.getOperand(0);
 			const auto info = fetchInfo(op);
-			const auto res = handleCastInstruction(info, opCode);
+			const auto res = handleCastInstruction(info, opCode, i.getType());
 			saveValueInfo(&i, res);
 
 			DEBUG(if (!info) logInfo("operand range is null"));

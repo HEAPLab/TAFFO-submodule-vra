@@ -26,7 +26,8 @@ range_ptr_t handleUnaryInstruction(const range_ptr_t &op,
 
 /** Handle cast instructions */
 range_ptr_t handleCastInstruction(const range_ptr_t &op,
-                                  const unsigned OpCode);
+                                  const unsigned OpCode,
+				  const llvm::Type *dest);
 
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
@@ -61,6 +62,9 @@ range_ptr_t handleCastToUI(const range_ptr_t &op);
 
 /** Cast To Signed Integer */
 range_ptr_t handleCastToSI(const range_ptr_t &op);
+
+/** FPTrunc */
+range_ptr_t handleFPTrunc(const range_ptr_t &op, const llvm::Type *dest);
 
 //-----------------------------------------------------------------------------
 // Boolean

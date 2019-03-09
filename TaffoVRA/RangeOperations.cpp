@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <limits>
 #include <map>
+#include "llvm/ADT/APFloat.h"
 
 using namespace taffo;
 
@@ -71,7 +72,8 @@ range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
 
 /** Cast instructions */
 range_ptr_t taffo::handleCastInstruction(const range_ptr_t &op,
-                                         const unsigned OpCode)
+                                         const unsigned OpCode,
+					 const llvm::Type *dest)
 {
   switch (OpCode) {
 		case llvm::Instruction::Trunc: // TODO implement
@@ -90,9 +92,9 @@ range_ptr_t taffo::handleCastInstruction(const range_ptr_t &op,
 		case llvm::Instruction::SIToFP:
 			return copyRange(op);
 			break;
-		case llvm::Instruction::FPTrunc: // TODO implement
-			break;
-		case llvm::Instruction::FPExt: // TODO implement
+		case llvm::Instruction::FPTrunc:
+		  	return handleFPTrunc(op, dest);
+		case llvm::Instruction::FPExt:
 			return copyRange(op);
 			break;
 		case llvm::Instruction::PtrToInt:
@@ -324,6 +326,37 @@ range_ptr_t taffo::handleCastToSI(const range_ptr_t &op)
 	const num_t r1 = static_cast<num_t>(static_cast<long>(op->min()));
 	const num_t r2 = static_cast<num_t>(static_cast<long>(op->max()));
 	return make_range(r1,r2);
+}
+
+/** FPTrunc */
+range_ptr_t taffo::handleFPTrunc(const range_ptr_t &op,
+				 const llvm::Type *dest)
+{
+	if (!op) {
+		return nullptr;
+	}
+	assert(dest && dest->isFloatingPointTy()
+	       && "Non-floating-point destination Type.");
+
+	llvm::APFloat apmin(op->min());
+	llvm::APFloat apmax(op->max());
+	// Convert with most conservative rounding mode
+	bool losesInfo;
+	apmin.convert(dest->getFltSemantics(),
+		      llvm::APFloatBase::roundingMode::rmTowardNegative,
+		      &losesInfo);
+	apmax.convert(dest->getFltSemantics(),
+		      llvm::APFloatBase::roundingMode::rmTowardPositive,
+		      &losesInfo);
+
+	// Convert back to double
+	apmin.convert(llvm::APFloat::IEEEdouble(),
+		      llvm::APFloatBase::roundingMode::rmTowardNegative,
+		      &losesInfo);
+	apmax.convert(llvm::APFloat::IEEEdouble(),
+		      llvm::APFloatBase::roundingMode::rmTowardPositive,
+		      &losesInfo);
+	return make_range(apmin.convertToDouble(), apmax.convertToDouble());
 }
 
 /** boolean Xor instruction */
