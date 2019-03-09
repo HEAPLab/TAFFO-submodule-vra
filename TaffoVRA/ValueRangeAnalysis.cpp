@@ -609,11 +609,19 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 			for (auto &i : bb.getInstList()) {
 				// fetch info about Instruction i, if any
 				InputInfo *II = MDManager.retrieveInputInfo(i);
+				const auto range = fetchInfo(&i);
 				if (II != nullptr) {
-					const auto range = fetchInfo(&i);
 					if (range != nullptr) {
 						II->IRange.reset(new Range(range->min(), range->max()));
 						MDManager.setInputInfoMetadata(i, *II);
+					} else {
+						// TODO set default
+					}
+				} else {
+				  	if (range != nullptr) {
+						InputInfo NewII;
+						NewII.IRange.reset(new Range(range->min(), range->max()));
+						MDManager.setInputInfoMetadata(i, NewII);
 					} else {
 						// TODO set default
 					}
