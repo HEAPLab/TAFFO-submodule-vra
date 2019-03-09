@@ -101,14 +101,16 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		// retrieve info about function parameters
 		SmallVector<mdutils::MDInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
-		fun_arg_input[&f] = std::list<range_ptr_t>();
-		for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
-			// TODO: struct support
-			InputInfo *ii = dyn_cast_or_null<InputInfo>(*itII);
-			if (ii != nullptr && isValidRange(ii->IRange.get())) {
-				fun_arg_input[&f].push_back(make_range(ii->IRange->Min, ii->IRange->Max));
-			} else {
-				fun_arg_input[&f].push_back(nullptr);
+		if (!argsII.empty()) {
+			fun_arg_input[&f] = std::list<range_ptr_t>();
+			for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
+			  // TODO: struct support
+			  InputInfo *ii = dyn_cast_or_null<InputInfo>(*itII);
+			  if (ii != nullptr && isValidRange(ii->IRange.get())) {
+			    fun_arg_input[&f].push_back(make_range(ii->IRange->Min, ii->IRange->Max));
+			  } else {
+			    fun_arg_input[&f].push_back(nullptr);
+			  }
 			}
 		}
 
@@ -590,13 +592,22 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		// arg range
 		SmallVector<mdutils::MDInfo*, 5> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
+		std::list<InputInfo> newII;
 		auto argsIt = argsII.begin();
 		for (Argument &arg : f.args()) {
 			const auto range = fetchInfo(&arg);
 			if (range != nullptr) {
 				// TODO struct support
-				InputInfo *ii = cast<InputInfo>(*argsIt);
-				ii->IRange.reset(new Range(range->min(), range->max()));
+			  	Range *newRange = new Range(range->min(), range->max());
+			  	if (argsIt != argsII.end()) {
+					InputInfo *ii = cast<InputInfo>(*argsIt);
+					ii->IRange.reset(newRange);
+				} else {
+					newII.push_back(InputInfo(nullptr,
+								  std::shared_ptr<Range>(newRange),
+								  nullptr));
+					argsII.push_back(&newII.back());
+				}
 			} else {
 				// TODO set default
 			}
