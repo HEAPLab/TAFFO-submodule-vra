@@ -3,6 +3,7 @@
 #include "RangeOperations.hpp"
 #include "Metadata.h"
 #include "MemSSAUtils.hpp"
+#include "TopologicalBBSort.hpp"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
@@ -215,7 +216,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	call_stack.push_back(&F);
 
 	// get function entry point: getEntryBlock
-	std::set<llvm::BasicBlock*> bb_queue;
+	TopologicalBBQueue bb_queue;
 	std::set<llvm::BasicBlock*> bb_unvisited_set;
 	for (auto &bb : F.getBasicBlockList()) {
 		llvm::BasicBlock* bb_ptr = &bb;
@@ -224,17 +225,14 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	}
 	llvm::BasicBlock* current_bb = &F.getEntryBlock();
 
-	// TODO: maybe we should make a local copy of bb_priority,
-	// for when the same function is analyzed multiple times
-	// (e.g. recursion, multiple calls with different arguments...)
+	// TODO: we should make a local copy of bb_priority in order to support recursion
 	while(current_bb != nullptr)
 	{
 		processBasicBlock(*current_bb);
 
-		// update bb_queue by removing current bb and insert its successors
-		bb_queue.erase(current_bb);
 		bb_unvisited_set.erase(current_bb);
 
+		// update bb_queue by removing current bb and insert its successors
 		llvm::BasicBlock* unique_successor = current_bb->getUniqueSuccessor();
 		if (unique_successor != nullptr) {
 			bb_queue.insert(unique_successor);
@@ -252,17 +250,17 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 			}
 		}
 
+		// update current_bb
 		if (bb_queue.empty()) {
 			if (bb_unvisited_set.empty()) {
-				bb_queue.insert(nullptr);
+			  	current_bb = nullptr;
 			} else {
 				llvm::BasicBlock* bb_ptr = *bb_unvisited_set.begin();
-				bb_queue.insert(bb_ptr);
+				current_bb = bb_ptr;
 			}
+		} else {
+			current_bb = bb_queue.popFirst();
 		}
-
-		// update current_bb
-		current_bb = *bb_queue.begin();
 	} // end iteration over bb
 
 	call_stack.pop_back();
