@@ -69,6 +69,8 @@ private:
 
 	inline generic_range_ptr_t handleLoadInstr(const llvm::Instruction* load);
 
+	inline generic_range_ptr_t handleGEPInstr(const llvm::Instruction* gep);
+
 	inline range_ptr_t handleCmpInstr(const llvm::Instruction* cmp);
 
 	inline generic_range_ptr_t handlePhiNode(const llvm::Instruction* phi);
@@ -78,17 +80,17 @@ private:
 	inline unsigned find_recursion_count(const llvm::Function* f);
 
 protected:
-	const generic_range_ptr_t fetchInfo(const llvm::Value* v) const;
+	const generic_range_ptr_t fetchInfo(const llvm::Value* v);
 
-	const generic_range_ptr_t fetchInfo(const llvm::Value* v, std::stack<unsigned>& offset) const;
+	const generic_range_ptr_t fetchInfo(const llvm::Value* v, std::stack<std::vector<unsigned>>& offset) const;
 
 	void saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info);
 
 	VRA_RangeNode* getNode(const llvm::Value* v) const;
 
-	generic_range_ptr_t fetchRange(const VRA_RangeNode* node, std::stack<unsigned>& offset) const;
+	generic_range_ptr_t fetchRange(const VRA_RangeNode* node, std::stack<std::vector<unsigned>>& offset) const;
 
-	void setRange(VRA_RangeNode* node, const generic_range_ptr_t& info, std::stack<unsigned>& offset);
+	void setRange(VRA_RangeNode* node, const generic_range_ptr_t& info, std::stack<std::vector<unsigned>>& offset);
 
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
 

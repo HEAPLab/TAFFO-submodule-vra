@@ -13,22 +13,22 @@ namespace taffo {
 struct VRA_RangeNode {
 private:
 	const llvm::Value* parent;
-	unsigned parent_offset;
+	std::vector<unsigned> parent_offset;
 	generic_range_ptr_t range;
 	bool _hasRange;
 
 public:
 	VRA_RangeNode() {}
 	VRA_RangeNode(const generic_range_ptr_t& r)
-		: parent(nullptr), parent_offset(0), range(r), _hasRange(true) {}
+		: parent(nullptr), parent_offset(), range(r), _hasRange(true) {}
 
-	VRA_RangeNode(const llvm::Value* p, unsigned offset)
+	VRA_RangeNode(const llvm::Value* p, std::vector<unsigned> offset)
 		: parent(p), parent_offset(offset), range(nullptr), _hasRange(false) {}
 
 public:
 	inline const llvm::Value* getParent() const {return parent;}
 
-	inline unsigned getOffset() const {return parent_offset;}
+	inline const std::vector<unsigned> getOffset() const {return parent_offset;}
 
 	inline generic_range_ptr_t getRange() const {return range;}
 
