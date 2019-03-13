@@ -22,6 +22,7 @@
 
 #define DEBUG_TYPE "taffo-vra"
 #define DEBUG_VRA "ValueRangeAnalysis"
+#define DEBUG_HEAD "[TAFFO][VRA]"
 
 namespace taffo {
 
@@ -67,7 +68,7 @@ private:
 
 	inline void handleStoreInstr(const llvm::Instruction* store);
 
-	inline generic_range_ptr_t handleLoadInstr(const llvm::Instruction* load);
+	inline generic_range_ptr_t handleLoadInstr(llvm::Instruction* load);
 
 	inline generic_range_ptr_t handleGEPInstr(const llvm::Instruction* gep);
 
@@ -95,6 +96,11 @@ protected:
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
 
 	static void emitError(const std::string& message);
+	static std::string to_string(const generic_range_ptr_t& range);
+        static void logInstruction(const llvm::Value* v);
+        static void logRangeln(const generic_range_ptr_t& range);
+        static void logInfo(const llvm::StringRef info);
+        static void logError(const llvm::StringRef error);
 
 	// data structures
 private:

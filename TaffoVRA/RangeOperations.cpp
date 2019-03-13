@@ -4,7 +4,8 @@
 #include <assert.h>
 #include <limits>
 #include <map>
-#include <memory>
+//#include <memory>
+#include "llvm/ADT/APFloat.h"
 
 using namespace taffo;
 
@@ -72,7 +73,8 @@ range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
 
 /** Cast instructions */
 generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
-                                                 const unsigned OpCode)
+						 const unsigned OpCode,
+						 const llvm::Type *dest)
 {
   switch (OpCode) {
 		case llvm::Instruction::Trunc: // TODO implement
@@ -91,9 +93,9 @@ generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
 		case llvm::Instruction::SIToFP:
 			return copyRange(op);
 			break;
-		case llvm::Instruction::FPTrunc: // TODO implement
-			break;
-		case llvm::Instruction::FPExt: // TODO implement
+		case llvm::Instruction::FPTrunc:
+		  	return handleFPTrunc(op, dest);
+		case llvm::Instruction::FPExt:
 			return copyRange(op);
 			break;
 		case llvm::Instruction::PtrToInt:
@@ -327,6 +329,38 @@ generic_range_ptr_t taffo::handleCastToSI(const generic_range_ptr_t &op)
 	const num_t r1 = static_cast<num_t>(static_cast<long>(scalar->min()));
 	const num_t r2 = static_cast<num_t>(static_cast<long>(scalar->max()));
 	return make_range(r1,r2);
+}
+
+/** FPTrunc */
+generic_range_ptr_t taffo::handleFPTrunc(const generic_range_ptr_t &gop,
+					 const llvm::Type *dest)
+{
+	const range_ptr_t op = std::static_pointer_cast<VRA_Range<num_t>>(gop);
+	if (!op) {
+		return nullptr;
+	}
+	assert(dest && dest->isFloatingPointTy()
+	       && "Non-floating-point destination Type.");
+
+	llvm::APFloat apmin(op->min());
+	llvm::APFloat apmax(op->max());
+	// Convert with most conservative rounding mode
+	bool losesInfo;
+	apmin.convert(dest->getFltSemantics(),
+		      llvm::APFloatBase::roundingMode::rmTowardNegative,
+		      &losesInfo);
+	apmax.convert(dest->getFltSemantics(),
+		      llvm::APFloatBase::roundingMode::rmTowardPositive,
+		      &losesInfo);
+
+	// Convert back to double
+	apmin.convert(llvm::APFloat::IEEEdouble(),
+		      llvm::APFloatBase::roundingMode::rmTowardNegative,
+		      &losesInfo);
+	apmax.convert(llvm::APFloat::IEEEdouble(),
+		      llvm::APFloatBase::roundingMode::rmTowardPositive,
+		      &losesInfo);
+	return make_range(apmin.convertToDouble(), apmax.convertToDouble());
 }
 
 /** boolean Xor instruction */

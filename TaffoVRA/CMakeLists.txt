@@ -7,6 +7,8 @@ add_llvm_loadable_module(TaffoVRA
   RangeNode.hpp
   ValueRangeAnalysis.cpp
   ValueRangeAnalysis.hpp
+  MemSSAUtils.cpp
+  MemSSAUtils.hpp
 
   PLUGIN_TOOL
   opt
@@ -20,4 +22,4 @@ endif()
 set_property(TARGET TaffoVRA PROPERTY CXX_STANDARD 11)
 set_property(TARGET TaffoVRA PROPERTY CXX_STANDARD_REQUIRED ON)
 
-target_link_libraries(TaffoVRA MDUtils m stdc++)
+target_link_libraries(TaffoVRA TaffoUtils m stdc++)
