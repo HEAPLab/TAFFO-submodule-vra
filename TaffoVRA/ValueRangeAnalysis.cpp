@@ -226,6 +226,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	llvm::BasicBlock* current_bb = &F.getEntryBlock();
 
 	// TODO: we should make a local copy of bb_priority in order to support recursion
+	// TODO: use a better algorithm based on (post-)dominator tree
 	while(current_bb != nullptr)
 	{
 		processBasicBlock(*current_bb);
