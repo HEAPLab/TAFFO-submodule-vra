@@ -480,6 +480,10 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	logInstruction(call);
 	// fetch function name
 	llvm::Function* callee = call_i->getCalledFunction();
+	if (callee == nullptr) {
+		logError("indirect calls not supported yet");
+		return;
+	}
 	const std::string calledFunctionName = callee->getName();
 	std::list<range_ptr_t> arg_ranges;
 	for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
