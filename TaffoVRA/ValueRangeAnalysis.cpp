@@ -172,45 +172,37 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	}
 
 	// fetch info about actual parameters
-	auto param_lookup_it = fun_arg_input.find(&F);
-	if (param_lookup_it == fun_arg_input.end()) {
-		param_lookup_it = fun_arg_derived.find(&F);
-		if (param_lookup_it != fun_arg_derived.end()) {
-			// save derived info
-		  	DEBUG(dbgs() << DEBUG_HEAD " Loading derived arguments: ");
-			auto param_val_it = F.arg_begin();
-			auto param_info_it = param_lookup_it->second.begin();
-			while (param_val_it != F.arg_end()) {
-				llvm::Argument* arg_ptr = param_val_it;
-				llvm::Value* arg_val = dyn_cast<llvm::Value>(arg_ptr);
-				saveValueInfo(arg_val, *param_info_it);
-
-				DEBUG(dbgs() << "{ " << *arg_ptr << " : "
-				      << to_string(*param_info_it) << " }, ");
-
-				param_info_it++;
-				param_val_it++;
-			}
-			DEBUG(dbgs() << "\n");
-		}
-	} else {
-		// save input info
-	  	DEBUG(dbgs() << DEBUG_HEAD " Loading metadata arguments: ");
-		auto param_val_it = F.arg_begin();
-		auto param_info_it = param_lookup_it->second.begin();
-		while (param_val_it != F.arg_end()) {
-			llvm::Argument* arg_ptr = param_val_it;
-			llvm::Value* arg_val = dyn_cast<llvm::Value>(arg_ptr);
-			saveValueInfo(arg_val, *param_info_it);
-
-			DEBUG(dbgs() << "{ " << *arg_ptr << " : "
-			      << to_string(*param_info_it) << " }, ");
-
-			param_info_it++;
-			param_val_it++;
-		}
-		DEBUG(dbgs() << "\n");
+	bool has_input_info = false;
+	bool has_derived_info = false;
+	std::list<range_ptr_t>::iterator input_info_it;
+	std::list<range_ptr_t>::iterator derived_info_it;
+	auto arg_list_lookup = fun_arg_input.find(&F);
+	if (arg_list_lookup != fun_arg_input.end()) {
+        	input_info_it = arg_list_lookup->second.begin();
+		has_input_info = true;
 	}
+	arg_list_lookup = fun_arg_derived.find(&F);
+	if (arg_list_lookup != fun_arg_derived.end()) {
+		derived_info_it = arg_list_lookup->second.begin();
+		has_derived_info = true;
+	}
+	DEBUG(dbgs() << DEBUG_HEAD " Loading argument ranges: ");
+	for (llvm::Argument* formal_arg = F.arg_begin();
+	     formal_arg != F.arg_end();
+	     ++formal_arg) {
+		range_ptr_t info = nullptr;
+		if (has_input_info && *input_info_it != nullptr)
+		 	info = *input_info_it;
+		else if (has_derived_info && *derived_info_it != nullptr)
+			info = *derived_info_it;
+
+		saveValueInfo(formal_arg, info);
+		DEBUG(dbgs() << "{ " << *formal_arg << " : " << to_string(info) << " }, ");
+
+		if (has_input_info) ++input_info_it;
+		if (has_derived_info) ++derived_info_it;
+	}
+	DEBUG(dbgs() << "\n");
 
 	// update stack for the simulation of execution
 	call_stack.push_back(&F);
@@ -601,14 +593,18 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 			const auto range = fetchInfo(&arg);
 			if (range != nullptr) {
 				// TODO struct support
-			  	Range *newRange = new Range(range->min(), range->max());
+			  	std::shared_ptr<Range> newRange =
+				  std::make_shared<Range>(range->min(), range->max());
 			  	if (argsIt != argsII.end()) {
-					InputInfo *ii = cast<InputInfo>(*argsIt);
-					ii->IRange.reset(newRange);
+					if (*argsIt != nullptr) {
+						InputInfo *ii = cast<InputInfo>(*argsIt);
+						ii->IRange.swap(newRange);
+					} else {
+						newII.push_back(InputInfo(nullptr, newRange, nullptr));
+						*argsIt = &newII.back();
+					}
 				} else {
-					newII.push_back(InputInfo(nullptr,
-								  std::shared_ptr<Range>(newRange),
-								  nullptr));
+					newII.push_back(InputInfo(nullptr, newRange, nullptr));
 					argsII.push_back(&newII.back());
 				}
 			} else {
