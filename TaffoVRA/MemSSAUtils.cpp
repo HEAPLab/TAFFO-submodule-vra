@@ -67,7 +67,9 @@ findClobberingValues(Instruction *i, MemoryAccess *ma) {
 Value *MemSSAUtils::getOriginPointer(MemorySSA &MemSSA, Value *Pointer) {
   assert(Pointer != nullptr);
 
-  if (isa<Argument>(Pointer) || isa<AllocaInst>(Pointer)) {
+  if (isa<Argument>(Pointer)
+      || isa<AllocaInst>(Pointer)
+      || isa<GlobalVariable>(Pointer)) {
     return Pointer;
   }
   else if (GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(Pointer)) {
