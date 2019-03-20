@@ -54,6 +54,9 @@ range_ptr_t handleDiv(const range_ptr_t &op1, const range_ptr_t &op2);
 /** operator% */
 range_ptr_t handleRem(const range_ptr_t &op1, const range_ptr_t &op2);
 
+/** operator<< */
+range_ptr_t handleShl(const range_ptr_t &op1, const range_ptr_t &op2);
+
 //-----------------------------------------------------------------------------
 // Cast
 //-----------------------------------------------------------------------------

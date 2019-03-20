@@ -40,7 +40,8 @@ range_ptr_t taffo::handleBinaryInstruction(const range_ptr_t &op1,
 		case llvm::Instruction::FRem:
 			return handleRem(op1,op2);
 			break;
-		case llvm::Instruction::Shl: // TODO implement
+		case llvm::Instruction::Shl:
+			return handleShl(op1,op2);
 		case llvm::Instruction::LShr: // TODO implement
 		case llvm::Instruction::AShr: // TODO implement
 		case llvm::Instruction::And: // TODO implement
@@ -304,6 +305,18 @@ range_ptr_t taffo::handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
 	const num_t r1 = (alwaysNeg) ? - bound : (alwaysPos) ? 0 : -bound;
 	const num_t r2 = (alwaysNeg) ? 0 : (alwaysPos) ? bound : bound;
 	return make_range(r1,r2);
+}
+
+range_ptr_t taffo::handleShl(const range_ptr_t &op1, const range_ptr_t &op2)
+{
+	// FIXME: only works if op2 is positive and no overflow occurs.
+	if (!op1 || !op2) {
+		return nullptr;
+	}
+	const unsigned shift = static_cast<unsigned>(op1->max());
+	const num_t rl = static_cast<num_t>(static_cast<long>(op2->min()) << shift);
+	const num_t ru = static_cast<num_t>(static_cast<long>(op2->max()) << shift);
+	return make_range(std::min(rl, ru), std::max(rl, ru));
 }
 
 /** CastToUInteger */
