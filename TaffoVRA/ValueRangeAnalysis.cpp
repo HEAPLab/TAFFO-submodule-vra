@@ -333,8 +333,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 					handleStoreInstr(&i);
 					break;
 				case llvm::Instruction::GetElementPtr:
-					emitError("Handling of GetElementPtr not supported yet");
-					break; // TODO implement
+					break;
 				case llvm::Instruction::Fence:
 					emitError("Handling of Fence not supported yet");
 					break; // TODO implement
