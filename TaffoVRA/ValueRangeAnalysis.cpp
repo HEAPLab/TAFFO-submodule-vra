@@ -139,11 +139,11 @@ void ValueRangeAnalysis::processModule(Module &M)
 	// TODO try to implement symbolic execution of loops
 
 	// first create processing queue, then evaluate them
-	for (auto f = M.begin(); f != M.end(); ++f) {
-		llvm::Function* f_ptr = &*f;
-    if (f_ptr->empty())
-      continue;
-		f_unvisited_set.insert(f_ptr);
+	for (llvm::Function &f : M) {
+		if (f.empty()
+		    || (!PropagateAll && !MetadataManager::isStartingPoint(f)))
+		  continue;
+		f_unvisited_set.insert(&f);
 	}
 
 	// fetch initial function
