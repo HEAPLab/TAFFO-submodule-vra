@@ -164,11 +164,11 @@ void ValueRangeAnalysis::processModule(Module &M)
 	// TODO try to implement symbolic execution of loops
 
 	// first create processing queue, then evaluate them
-	for (auto f = M.begin(); f != M.end(); ++f) {
-		llvm::Function* f_ptr = &*f;
-    if (f_ptr->empty())
-      continue;
-		f_unvisited_set.insert(f_ptr);
+	for (llvm::Function &f : M) {
+		if (f.empty()
+		    || (!PropagateAll && !MetadataManager::isStartingPoint(f)))
+		  continue;
+		f_unvisited_set.insert(&f);
 	}
 
 	// fetch initial function
@@ -197,45 +197,37 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	}
 
 	// fetch info about actual parameters
-	auto param_lookup_it = fun_arg_input.find(&F);
-	if (param_lookup_it == fun_arg_input.end()) {
-		param_lookup_it = fun_arg_derived.find(&F);
-		if (param_lookup_it != fun_arg_derived.end()) {
-			// save derived info
-		  	DEBUG(dbgs() << DEBUG_HEAD " Loading derived arguments: ");
-			auto param_val_it = F.arg_begin();
-			auto param_info_it = param_lookup_it->second.begin();
-			while (param_val_it != F.arg_end()) {
-				llvm::Argument* arg_ptr = param_val_it;
-				llvm::Value* arg_val = dyn_cast<llvm::Value>(arg_ptr);
-				saveValueInfo(arg_val, *param_info_it);
-
-				DEBUG(dbgs() << "{ " << *arg_ptr << " : "
-				      << to_string(*param_info_it) << " }, ");
-
-				param_info_it++;
-				param_val_it++;
-			}
-			DEBUG(dbgs() << "\n");
-		}
-	} else {
-		// save input info
-	  	DEBUG(dbgs() << DEBUG_HEAD " Loading metadata arguments: ");
-		auto param_val_it = F.arg_begin();
-		auto param_info_it = param_lookup_it->second.begin();
-		while (param_val_it != F.arg_end()) {
-			llvm::Argument* arg_ptr = param_val_it;
-			llvm::Value* arg_val = dyn_cast<llvm::Value>(arg_ptr);
-			saveValueInfo(arg_val, *param_info_it);
-
-			DEBUG(dbgs() << "{ " << *arg_ptr << " : "
-			      << to_string(*param_info_it) << " }, ");
-
-			param_info_it++;
-			param_val_it++;
-		}
-		DEBUG(dbgs() << "\n");
+	bool has_input_info = false;
+	bool has_derived_info = false;
+	std::list<generic_range_ptr_t>::iterator input_info_it;
+	std::list<generic_range_ptr_t>::iterator derived_info_it;
+	auto arg_list_lookup = fun_arg_input.find(&F);
+	if (arg_list_lookup != fun_arg_input.end()) {
+        	input_info_it = arg_list_lookup->second.begin();
+		has_input_info = true;
 	}
+	arg_list_lookup = fun_arg_derived.find(&F);
+	if (arg_list_lookup != fun_arg_derived.end()) {
+		derived_info_it = arg_list_lookup->second.begin();
+		has_derived_info = true;
+	}
+	DEBUG(dbgs() << DEBUG_HEAD " Loading argument ranges: ");
+	for (llvm::Argument* formal_arg = F.arg_begin();
+	     formal_arg != F.arg_end();
+	     ++formal_arg) {
+		generic_range_ptr_t info = nullptr;
+		if (has_input_info && *input_info_it != nullptr)
+		 	info = *input_info_it;
+		else if (has_derived_info && *derived_info_it != nullptr)
+			info = *derived_info_it;
+
+		saveValueInfo(formal_arg, info);
+		DEBUG(dbgs() << "{ " << *formal_arg << " : " << to_string(info) << " }, ");
+
+		if (has_input_info) ++input_info_it;
+		if (has_derived_info) ++derived_info_it;
+	}
+	DEBUG(dbgs() << "\n");
 
 	// update stack for the simulation of execution
 	call_stack.push_back(&F);
@@ -251,6 +243,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	llvm::BasicBlock* current_bb = &F.getEntryBlock();
 
 	// TODO: we should make a local copy of bb_priority in order to support recursion
+	// TODO: use a better algorithm based on (post-)dominator tree
 	while(current_bb != nullptr)
 	{
 		processBasicBlock(*current_bb);
@@ -369,8 +362,8 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 					break;
 				case llvm::Instruction::GetElementPtr:
 					tmp = handleGEPInstr(&i);
-          saveValueInfo(&i, tmp);
-          break;
+					saveValueInfo(&i, tmp);
+					break;
 				case llvm::Instruction::Fence:
 					emitError("Handling of Fence not supported yet");
 					break; // TODO implement
@@ -508,6 +501,10 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	logInstruction(call);
 	// fetch function name
 	llvm::Function* callee = call_i->getCalledFunction();
+	if (callee == nullptr) {
+		logError("indirect calls not supported yet");
+		return;
+	}
 	const std::string calledFunctionName = callee->getName();
 
 	// fetch ranges of arguments
@@ -639,20 +636,23 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		for (Argument &arg : f.args()) {
 			const auto range = fetchInfo(&arg);
 			if (range != nullptr) {
-				// TODO struct support
 				const range_ptr_t scalar =
 				  std::dynamic_ptr_cast<range_t>(range);
 				if (scalar != nullptr) {
-				  Range *newRange = new Range(scalar->min(), scalar->max());
-				  if (argsIt != argsII.end()) {
-				    InputInfo *ii = cast<InputInfo>(*argsIt);
-				    ii->IRange.reset(newRange);
-				  } else {
-				    newII.push_back(InputInfo(nullptr,
-							      std::shared_ptr<Range>(newRange),
-							      nullptr));
-				    argsII.push_back(&newII.back());
-				  }
+			  		std::shared_ptr<Range> newRange =
+					  std::make_shared<Range>(scalar->min(), scalar->max());
+					if (argsIt != argsII.end()) {
+						if (*argsIt != nullptr) {
+							InputInfo *ii = cast<InputInfo>(*argsIt);
+							ii->IRange.swap(newRange);
+						} else {
+							newII.push_back(InputInfo(nullptr, newRange, nullptr));
+							*argsIt = &newII.back();
+						}
+					} else {
+						newII.push_back(InputInfo(nullptr, newRange, nullptr));
+						argsII.push_back(&newII.back());
+					}
 				}
 			} else {
 				// TODO set default

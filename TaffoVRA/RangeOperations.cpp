@@ -41,9 +41,11 @@ range_ptr_t taffo::handleBinaryInstruction(const range_ptr_t &op1,
 		case llvm::Instruction::FRem:
 			return handleRem(op1,op2);
 			break;
-		case llvm::Instruction::Shl: // TODO implement
+		case llvm::Instruction::Shl:
+			return handleShl(op1,op2);
 		case llvm::Instruction::LShr: // TODO implement
-		case llvm::Instruction::AShr: // TODO implement
+		case llvm::Instruction::AShr:
+			return handleAShr(op1,op2);
 		case llvm::Instruction::And: // TODO implement
 		case llvm::Instruction::Or: // TODO implement
 		case llvm::Instruction::Xor: // TODO implement
@@ -305,6 +307,33 @@ range_ptr_t taffo::handleRem(const range_ptr_t &op1, const range_ptr_t &op2)
 	const num_t r1 = (alwaysNeg) ? - bound : (alwaysPos) ? 0 : -bound;
 	const num_t r2 = (alwaysNeg) ? 0 : (alwaysPos) ? bound : bound;
 	return make_range(r1,r2);
+}
+
+range_ptr_t taffo::handleShl(const range_ptr_t &op1, const range_ptr_t &op2)
+{
+	// FIXME: it only works if no overflow occurs.
+	if (!op1 || !op2) {
+		return nullptr;
+	}
+	const unsigned sh_min = static_cast<unsigned>(op1->min());
+	const unsigned sh_max = static_cast<unsigned>(op1->max());
+	const long op_min = static_cast<long>(op2->min());
+	const long op_max = static_cast<long>(op2->max());
+	return make_range(static_cast<num_t>(op_min << ((op_min < 0) ? sh_max : sh_min)),
+			  static_cast<num_t>(op_max << ((op_max < 0) ? sh_min : sh_max)));
+}
+
+range_ptr_t taffo::handleAShr(const range_ptr_t &op1, const range_ptr_t &op2)
+{
+	if (!op1 || !op2) {
+		return nullptr;
+	}
+	const unsigned sh_min = static_cast<unsigned>(op1->min());
+	const unsigned sh_max = static_cast<unsigned>(op1->max());
+	const long op_min = static_cast<long>(op2->min());
+	const long op_max = static_cast<long>(op2->max());
+	return make_range(static_cast<num_t>(op_min >> ((op_min > 0) ? sh_max : sh_min)),
+			  static_cast<num_t>(op_max >> ((op_max > 0) ? sh_min : sh_max)));
 }
 
 /** CastToUInteger */

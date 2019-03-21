@@ -26,6 +26,11 @@
 
 namespace taffo {
 
+llvm::cl::opt<bool> PropagateAll("propagate-all",
+				 llvm::cl::desc("Propagate ranges for all functions, "
+						"not only those marked as starting point."),
+				 llvm::cl::init(false));
+
 struct ValueRangeAnalysis : public llvm::ModulePass {
 	static char ID;
 

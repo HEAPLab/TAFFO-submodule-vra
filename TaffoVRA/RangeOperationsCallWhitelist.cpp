@@ -8,6 +8,9 @@
 
 using namespace taffo;
 
+#define PI   0x1.921FB54442D18p+1
+#define PIO2 0x1.921FB54442D18p+0
+
 static range_ptr_t handleCallToCeil(const std::list<range_ptr_t>& operands)
 {
 	assert(operands.size() == 1 && "too many operands in function ceil");
@@ -118,14 +121,37 @@ static range_ptr_t handleCallToExp(const std::list<range_ptr_t>& operands)
 
 static range_ptr_t handleCallToSin(const std::list<range_ptr_t>& operands)
 {
-	// TODO implement
-	return nullptr;
+	assert(operands.size() == 1 && "too many operands in function Sin");
+	range_ptr_t op = operands.front();
+	if (!op) {
+		return nullptr;
+	}
+
+	// TODO: better range reduction
+	if (op->min() >= -PIO2 && op->max() <= PIO2) {
+	  return make_range(std::sin(op->min()), std::sin(op->max()));
+	}
+
+	return make_range(-1.0, 1.0);
 }
 
 static range_ptr_t handleCallToCos(const std::list<range_ptr_t>& operands)
 {
-	// TODO implement
-	return nullptr;
+	assert(operands.size() == 1 && "too many operands in function Cos");
+	range_ptr_t op = operands.front();
+	if (!op) {
+		return nullptr;
+	}
+
+	// TODO: better range reduction
+	if (op->min() >= -PI && op->max() <= 0.0) {
+	  return make_range(std::cos(op->min()), std::cos(op->max()));
+	}
+	if (op->min() >= 0.0 && op->max() <= PI) {
+	  return make_range(std::cos(op->max()), std::cos(op->min()));
+	}
+
+	return make_range(-1.0, 1.0);
 }
 
 static range_ptr_t handleCallToAcos(const std::list<range_ptr_t>& operands)
