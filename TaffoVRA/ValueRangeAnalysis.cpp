@@ -328,8 +328,10 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			const llvm::Value* op2 = i.getOperand(1);
 			const auto node1 = getNode(op1);
 			const auto node2 = getNode(op2);
-			const range_ptr_t info1 = (node1) ? node1->getScalarRange() : nullptr;
-			const range_ptr_t info2 = (node2) ? node2->getScalarRange() : nullptr;
+			const range_ptr_t info1 =
+			  std::dynamic_ptr_cast_or_null<range_t>(fetchInfo(op1));
+			const range_ptr_t info2 =
+			  std::dynamic_ptr_cast_or_null<range_t>(fetchInfo(op2));
 			const auto res = handleBinaryInstruction(info1, info2, opCode);
 			saveValueInfo(&i, res);
 
@@ -673,7 +675,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 				InputInfo *II = MDManager.retrieveInputInfo(i);
 				const auto range = fetchInfo(&i);
 				const range_ptr_t scalar =
-				  std::dynamic_ptr_cast<range_t>(range);
+				  std::dynamic_ptr_cast_or_null<range_t>(range);
 				if (scalar != nullptr) {
 				  if (II != nullptr) {
 				    if (scalar != nullptr) {
@@ -713,8 +715,8 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 	const llvm::Value* address_param = store_i->getPointerOperand();
 	const llvm::Value* value_param = store_i->getValueOperand();
 	const generic_range_ptr_t range = fetchInfo(value_param);
-	memory[address_param] = range;
-	memory[store_i] = range;
+	saveValueInfo(address_param, range);
+	saveValueInfo(store_i, range);
 	logRangeln(range);
 	return;
 }
@@ -733,16 +735,11 @@ generic_range_ptr_t ValueRangeAnalysis::handleLoadInstr(llvm::Instruction* load)
 	MemorySSA& memssa = getAnalysis<MemorySSAWrapperPass>(*load->getFunction()).getMSSA();
 	MemSSAUtils memssa_utils(memssa);
 	SmallVectorImpl<Value*>& def_vals = memssa_utils.getDefiningValues(load_i);
+	def_vals.push_back(load_i->getPointerOperand());
 
 	generic_range_ptr_t res = nullptr;
 	for (Value *dval : def_vals) {
-	  using const_it = decltype(memory)::const_iterator;
-	  const_it it = memory.find(dval);
-	  if (it != memory.end()) {
-	    res = getUnionRange(res, it->second);
-	  } else {
 	    res = getUnionRange(res, fetchInfo(dval));
-	  }
 	}
 	logRangeln(res);
 	return res;
@@ -763,6 +760,7 @@ generic_range_ptr_t ValueRangeAnalysis::handleGEPInstr(const llvm::Instruction* 
 				offset.push_back(n);
 			} else {
 				emitError("Index of GEP not constant");
+				return nullptr;
 			}
 		}
 		derived_ranges[gep] = new VRA_RangeNode(gep_i->getPointerOperand(), offset);
@@ -874,37 +872,22 @@ const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v)
 	}
 
 	if (const auto node = getNode(v)) {
-		if (node->hasRange()) {
+		if (node->isScalar()) {
 			return node->getRange();
 		} else {
-			std::stack<std::vector<unsigned>> offset;
-			offset.push(node->getOffset());
-			return fetchInfo(node->getParent(), offset);
+			std::list<std::vector<unsigned>> offset;
+			offset.push_back(node->getOffset());
+			return fetchRange(getNode(node->getParent()), offset);
 		}
 	}
 	const llvm::Constant* const_i = dyn_cast_or_null<llvm::Constant>(v);
 	if (const_i) {
-		const generic_range_ptr_t k = fetchConstant(const_i);
+		const range_ptr_t k = fetchConstant(const_i);
 		saveValueInfo(v, k);
 		return k;
 	}
 	// no info available
 	return nullptr;
-}
-
-const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v, std::stack<std::vector<unsigned>>& offset) const
-{
-  //fetch info in hierachical structure
-  if (const auto node = getNode(v)) {
-    if (node->hasRange()) {
-      return fetchRange(node,offset);
-    } else {
-      offset.push(node->getOffset());
-      return fetchInfo(node->getParent(), offset);
-    }
-  }
-
-  return nullptr;
 }
 
 //-----------------------------------------------------------------------------
@@ -980,7 +963,7 @@ range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval)
 		return nullptr;
 	}
 	emitError("Could not fetch range from llvm::Constant");
-	// TODO did I forgot something?
+	// TODO did I forget something?
 	return nullptr;
 }
 
@@ -996,12 +979,16 @@ void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const generic_range
 		}
 
 		// set
-		std::stack<std::vector<unsigned>> offset;
-		offset.push(node->getOffset());
+		std::list<std::vector<unsigned>> offset;
+		offset.push_back(node->getOffset());
+
 		const generic_range_ptr_t old = fetchRange(node, offset);
 		const generic_range_ptr_t updated = getUnionRange(old, info);
+
+		offset.clear();
+		offset.push_back(node->getOffset());
+
 		setRange(node, updated, offset);
-		// derived_ranges[v] = getUnionRange(it->second, info);
 		return;
 	}
 
@@ -1020,110 +1007,63 @@ VRA_RangeNode* ValueRangeAnalysis::getNode(const llvm::Value* v) const
 }
 
 generic_range_ptr_t ValueRangeAnalysis::fetchRange(const VRA_RangeNode* node,
-						   std::stack<std::vector<unsigned>>& offset) const
+						   std::list<std::vector<unsigned>>& offset) const
 {
+	if (!node) return nullptr;
 	if (node->hasRange()) {
 		if (node->isScalar()) {
 			return node->getScalarRange();
-		} else {
+		} else if (node->isStruct()) {
 			assert(!offset.empty() && "No offset supplied.");
-			range_s_ptr_t orig = node->getStructRange();
-			range_s_ptr_t parent = orig;
-			std::vector<unsigned> idxs = offset.top();
-			generic_range_ptr_t rng;
-			for (unsigned idx : idxs) {
-			  rng = orig->getRangeAt(idx);
-			  orig = std::dynamic_ptr_cast<VRA_Structured_Range>(rng);
-			  if (!orig) {
-			    dbgs() << "Leaf range reached but other indexes are present!\n";
-			    break;
-			  }
+			range_s_ptr_t current = node->getStructRange();
+			generic_range_ptr_t child = nullptr;
+			for (auto offset_it = offset.rbegin();
+			     offset_it != offset.rend(); ++offset_it) {
+				for (unsigned idx : *offset_it) {
+					child = current->getRangeAt(idx);
+					current = std::dynamic_ptr_cast<VRA_Structured_Range>(child);
+					if (!current)
+					  break;
+				}
 			}
-			//generic_range_ptr_t child = orig->getRangeAt(offset.top());
-			generic_range_ptr_t child = orig;
-			while (!offset.empty())
-			{
-			    offset.pop();
-			    parent = std::dynamic_ptr_cast<VRA_Structured_Range>(child);
-			    idxs = offset.top();
-			    for (unsigned idx : idxs) {
-			      rng = parent->getRangeAt(idx);
-			      parent = std::dynamic_ptr_cast<VRA_Structured_Range>(rng);
-			      if (!parent) {
-				dbgs() << "Leaf range reached but other indexes are present!\n";
-				break;
-			      }
-			    }
-			    //child = parent->getRangeAt(offset.top());
-			    child = parent;
-			}
-			return parent;
+			return child;
 		}
 	}
-	// recursively call parent to update its structure
-	offset.push(node->getOffset());
+	// if we didn't find anything, lookup parent
+	offset.push_back(node->getOffset());
 	return fetchRange(getNode(node->getParent()), offset);
 }
 
 
-void ValueRangeAnalysis::setRange(VRA_RangeNode* node, const generic_range_ptr_t& info, std::stack<std::vector<unsigned>>& offset)
+void ValueRangeAnalysis::setRange(VRA_RangeNode* node, const generic_range_ptr_t& info,
+				  std::list<std::vector<unsigned>>& offset)
 {
+	if (!node || !info) return;
 	if (node->hasRange()) {
 		if (node->isScalar()) {
-			const range_ptr_t scalar_info = std::dynamic_ptr_cast<range_t>(info);
-			range_ptr_t old = node->getScalarRange();
-			range_ptr_t actual = getUnionRange(old, scalar_info);
-			node->setRange(actual);
-		} else {
-			range_s_ptr_t orig = node->getStructRange();
-      range_s_ptr_t parent;
-      std::vector<unsigned> idxs = offset.top();
-      generic_range_ptr_t rng;
-      for (unsigned idx : idxs) {
-        rng = orig->getRangeAt(idx);
-        orig = std::dynamic_ptr_cast<VRA_Structured_Range>(rng);
-        if (!orig) {
-          dbgs() << "Leaf range reached but other indexes are present!\n";
-          break;
-        }
-      }
-      //generic_range_ptr_t child = orig->getRangeAt(offset.top());
-      generic_range_ptr_t child = orig;
-      while (!offset.empty())
-			{
-				offset.pop();
-				parent = std::dynamic_ptr_cast<VRA_Structured_Range>(child);
-				//child = parent->getRangeAt(offset.top());
-        idxs = offset.top();
-        for (unsigned idx : idxs) {
-          rng = parent->getRangeAt(idx);
-          parent = std::dynamic_ptr_cast<VRA_Structured_Range>(rng);
-          if (!parent) {
-            dbgs() << "Leaf range reached but other indexes are present!\n";
-            break;
-          }
-        }
-        child = parent;
+			const range_ptr_t scalar_info = std::static_ptr_cast<range_t>(info);
+			node->setRange(scalar_info);
+		} else if (node->isStruct()) {
+			assert(!offset.empty() && "No offset supplied.");
+			range_s_ptr_t parent = node->getStructRange();
+			range_s_ptr_t child = nullptr;
+			unsigned child_idx = 0U;
+			for (auto offset_it = offset.rbegin();
+			     offset_it != offset.rend(); ++offset_it) {
+				for (unsigned idx : *offset_it) {
+					child_idx = idx;
+					child = std::dynamic_ptr_cast_or_null<VRA_Structured_Range>(parent->getRangeAt(idx));
+					if (!child)
+					  break;
+					parent = child;
+				}
 			}
-      //TODO offset.top == nullptr ?
-      //parent->setRangeAt(offset.top(), info);
-      idxs = offset.top();
-      for (unsigned idx : idxs) {
-        rng = parent->getRangeAt(idx);
-        parent = std::dynamic_ptr_cast<VRA_Structured_Range>(rng);
-        if (parent) {
-          dbgs() << "Leaf range reached but other indexes are present!\n";
-          break;
-        }
-      }
-      parent->setRangeAt(*idxs.end(), info);
+			parent->setRangeAt(child_idx, info);
 		}
-		return;
 	}
 	// recursively call parent to update its structure
-	offset.push(node->getOffset());
+	offset.push_back(node->getOffset());
 	setRange(getNode(node->getParent()), info, offset);
-	return;
 }
 
 //-----------------------------------------------------------------------------

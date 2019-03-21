@@ -78,37 +78,38 @@ generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
 						 const unsigned OpCode,
 						 const llvm::Type *dest)
 {
+  const range_ptr_t scalar = std::dynamic_ptr_cast_or_null<range_t>(op);
   switch (OpCode) {
 		case llvm::Instruction::Trunc: // TODO implement
 			break;
 		case llvm::Instruction::ZExt:
 		case llvm::Instruction::SExt:
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		case llvm::Instruction::FPToUI:
-			return handleCastToUI(op);
+			return handleCastToUI(scalar);
 			break;
 		case llvm::Instruction::FPToSI:
-			return handleCastToSI(op);
+			return handleCastToSI(scalar);
 			break;
 		case llvm::Instruction::UIToFP:
 		case llvm::Instruction::SIToFP:
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		case llvm::Instruction::FPTrunc:
-		  	return handleFPTrunc(op, dest);
+		  	return handleFPTrunc(scalar, dest);
 		case llvm::Instruction::FPExt:
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		case llvm::Instruction::PtrToInt:
 		case llvm::Instruction::IntToPtr:
-			return handleCastToSI(op);
+			return handleCastToSI(scalar);
 			break;
 		case llvm::Instruction::BitCast: // TODO check
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		case llvm::Instruction::AddrSpaceCast:
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		default:
 			assert(false); // unsupported operation
@@ -337,42 +338,39 @@ range_ptr_t taffo::handleAShr(const range_ptr_t &op1, const range_ptr_t &op2)
 }
 
 /** CastToUInteger */
-generic_range_ptr_t taffo::handleCastToUI(const generic_range_ptr_t &op)
+range_ptr_t taffo::handleCastToUI(const range_ptr_t &op)
 {
-	const range_ptr_t scalar = std::static_pointer_cast<VRA_Range<num_t>>(op);
-	if (!scalar) {
+	if (!op) {
 		return nullptr;
 	}
-	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(scalar->min()));
-	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(scalar->max()));
+	const num_t r1 = static_cast<num_t>(static_cast<unsigned long>(op->min()));
+	const num_t r2 = static_cast<num_t>(static_cast<unsigned long>(op->max()));
 	return make_range(r1,r2);
 }
 
 /** CastToUInteger */
-generic_range_ptr_t taffo::handleCastToSI(const generic_range_ptr_t &op)
+range_ptr_t taffo::handleCastToSI(const range_ptr_t &op)
 {
-	const range_ptr_t scalar = std::static_pointer_cast<VRA_Range<num_t>>(op);
-	if (!scalar) {
+	if (!op) {
 		return nullptr;
 	}
-	const num_t r1 = static_cast<num_t>(static_cast<long>(scalar->min()));
-	const num_t r2 = static_cast<num_t>(static_cast<long>(scalar->max()));
+	const num_t r1 = static_cast<num_t>(static_cast<long>(op->min()));
+	const num_t r2 = static_cast<num_t>(static_cast<long>(op->max()));
 	return make_range(r1,r2);
 }
 
 /** FPTrunc */
-generic_range_ptr_t taffo::handleFPTrunc(const generic_range_ptr_t &gop,
-					 const llvm::Type *dest)
+range_ptr_t taffo::handleFPTrunc(const range_ptr_t &gop,
+				 const llvm::Type *dest)
 {
-	const range_ptr_t op = std::static_pointer_cast<VRA_Range<num_t>>(gop);
-	if (!op) {
+	if (!gop) {
 		return nullptr;
 	}
 	assert(dest && dest->isFloatingPointTy()
 	       && "Non-floating-point destination Type.");
 
-	llvm::APFloat apmin(op->min());
-	llvm::APFloat apmax(op->max());
+	llvm::APFloat apmin(gop->min());
+	llvm::APFloat apmax(gop->max());
 	// Convert with most conservative rounding mode
 	bool losesInfo;
 	apmin.convert(dest->getFltSemantics(),
@@ -450,13 +448,6 @@ range_ptr_t taffo::copyRange(const range_ptr_t &op)
 	return res;
 }
 
-/** deep copy of range */
-generic_range_ptr_t taffo::copyRange(const generic_range_ptr_t& op)
-{
-	// TODO implement
-	return nullptr;
-}
-
 /** create a generic boolean range */
 range_ptr_t taffo::getGenericBoolRange()
 {
@@ -492,14 +483,10 @@ range_ptr_t taffo::getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2)
 	return make_range(min, max);
 }
 
-generic_range_ptr_t taffo::getUnionRange(const generic_range_ptr_t &op1, const generic_range_ptr_t &op2)
+generic_range_ptr_t taffo::getUnionRange(const generic_range_ptr_t &op1,
+					 const generic_range_ptr_t &op2)
 {
-	if (!op1) {
-		return copyRange(op2);
-	}
-	if (!op2) {
-		return copyRange(op1);
-	}
-	// TODO implement
-	return nullptr;
+	range_ptr_t sop1 = std::dynamic_ptr_cast_or_null<range_t>(op1);
+	range_ptr_t sop2 = std::dynamic_ptr_cast_or_null<range_t>(op2);
+	return getUnionRange(sop1, sop2);
 }

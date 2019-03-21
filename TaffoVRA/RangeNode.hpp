@@ -66,7 +66,7 @@ public:
 		if (!isScalar()) {
 			return nullptr;
 		}
-		return std::static_pointer_cast<VRA_Range<num_t>>(range);
+		return std::static_pointer_cast<range_t>(range);
 	}
 
 	inline range_s_ptr_t getStructRange() const {

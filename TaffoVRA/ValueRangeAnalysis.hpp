@@ -17,7 +17,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <stack>
+#include <list>
 #include <InputInfo.h>
 
 #define DEBUG_TYPE "taffo-vra"
@@ -88,15 +88,15 @@ private:
 protected:
 	const generic_range_ptr_t fetchInfo(const llvm::Value* v);
 
-	const generic_range_ptr_t fetchInfo(const llvm::Value* v, std::stack<std::vector<unsigned>>& offset) const;
-
 	void saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info);
 
 	VRA_RangeNode* getNode(const llvm::Value* v) const;
 
-	generic_range_ptr_t fetchRange(const VRA_RangeNode* node, std::stack<std::vector<unsigned>>& offset) const;
+	generic_range_ptr_t fetchRange(const VRA_RangeNode* node,
+				       std::list<std::vector<unsigned>>& offset) const;
 
-	void setRange(VRA_RangeNode* node, const generic_range_ptr_t& info, std::stack<std::vector<unsigned>>& offset);
+	void setRange(VRA_RangeNode* node, const generic_range_ptr_t& info,
+		      std::list<std::vector<unsigned>>& offset);
 
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
 
@@ -113,12 +113,10 @@ private:
 	unsigned default_loop_iteration_count = 1;
 	const unsigned default_function_recursion_count = 0;
 
-	// TODO find a better ID than pointer to llvm::Value. Value name?
 	llvm::DenseMap<const llvm::Value*, generic_range_ptr_t> user_input;
 	llvm::DenseMap<const llvm::Value*, VRA_RangeNode*> derived_ranges;
 	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_input;
 	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_derived;
-	llvm::DenseMap<const llvm::Value*, generic_range_ptr_t> memory;
 	llvm::DenseMap<const llvm::Function*, unsigned> fun_rec_count;
 	llvm::DenseMap<const llvm::Loop*, unsigned> user_loop_iterations;
 	llvm::DenseMap<const llvm::Loop*, unsigned> derived_loop_iterations;

@@ -26,8 +26,8 @@ range_ptr_t handleUnaryInstruction(const range_ptr_t &op,
 
 /** Handle cast instructions */
 generic_range_ptr_t handleCastInstruction(const generic_range_ptr_t &op,
-                                  const unsigned OpCode,
-				  const llvm::Type *dest);
+					  const unsigned OpCode,
+					  const llvm::Type *dest);
 
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
@@ -64,13 +64,13 @@ range_ptr_t handleAShr(const range_ptr_t &op1, const range_ptr_t &op2);
 // Cast
 //-----------------------------------------------------------------------------
 /** Cast To Unsigned Integer */
-generic_range_ptr_t handleCastToUI(const generic_range_ptr_t &op);
+range_ptr_t handleCastToUI(const range_ptr_t &op);
 
 /** Cast To Signed Integer */
-generic_range_ptr_t handleCastToSI(const generic_range_ptr_t &op);
+range_ptr_t handleCastToSI(const range_ptr_t &op);
 
 /** FPTrunc */
-generic_range_ptr_t handleFPTrunc(const generic_range_ptr_t &op, const llvm::Type *dest);
+range_ptr_t handleFPTrunc(const range_ptr_t &op, const llvm::Type *dest);
 
 //-----------------------------------------------------------------------------
 // Boolean
@@ -89,9 +89,6 @@ range_ptr_t handleBooleanOr(const range_ptr_t &op1, const range_ptr_t &op2);
 //-----------------------------------------------------------------------------
 /** deep copy of range */
 range_ptr_t copyRange(const range_ptr_t &op);
-
-/** deep copy of range */
-generic_range_ptr_t copyRange(const generic_range_ptr_t &op);
 
 /** create a generic boolean range */
 range_ptr_t getGenericBoolRange();
