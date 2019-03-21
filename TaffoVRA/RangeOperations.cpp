@@ -146,8 +146,8 @@ generic_range_ptr_t taffo::handleCompare(const std::list<generic_range_ptr_t>& o
 	assert(ops.size() <= 2 && "too many operators in compare instruction");
 
 	// extract values for easy access
-	range_ptr_t lhs = std::dynamic_ptr_cast<range_t>(ops.front());
-	range_ptr_t rhs = std::dynamic_ptr_cast<range_t>(ops.back());
+	range_ptr_t lhs = std::dynamic_ptr_cast_or_null<range_t>(ops.front());
+	range_ptr_t rhs = std::dynamic_ptr_cast_or_null<range_t>(ops.back());
 	// if unavailable data, nothing can be said
 	if (!lhs || !rhs) {
 		return getGenericBoolRange();

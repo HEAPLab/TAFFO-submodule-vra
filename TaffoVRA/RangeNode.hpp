@@ -35,12 +35,13 @@ public:
 	inline bool hasRange() const {return _hasRange;}
 
 	inline bool isScalar() const {
-		return hasRange() && std::dynamic_ptr_cast<range_t>(range) != nullptr;
+		return hasRange()
+		  && std::dynamic_ptr_cast_or_null<range_t>(range) != nullptr;
 	}
 
 	inline bool isStruct() const {
 		return hasRange()
-			&& std::dynamic_ptr_cast<VRA_Structured_Range>(range) != nullptr;
+		  && std::dynamic_ptr_cast_or_null<VRA_Structured_Range>(range) != nullptr;
 	}
 
 	inline void setScalarRange(const range_ptr_t& r) {

@@ -18,6 +18,15 @@ namespace std {
 			return std::shared_ptr<T>();
 		}
 	}
+	template< class T, class U >
+	std::shared_ptr<T> dynamic_ptr_cast_or_null( const std::shared_ptr<U>& r ) noexcept
+	{
+		if (auto p = llvm::dyn_cast_or_null<typename std::shared_ptr<T>::element_type>(r.get())) {
+			return std::shared_ptr<T>(r, p);
+		} else {
+			return std::shared_ptr<T>();
+		}
+	}
 } // end namespace std
 
 namespace taffo {
