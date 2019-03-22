@@ -91,6 +91,7 @@ protected:
 	void saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info);
 
 	VRA_RangeNode* getNode(const llvm::Value* v) const;
+	VRA_RangeNode* getOrCreateNode(const llvm::Value* v);
 
 	generic_range_ptr_t fetchRange(const VRA_RangeNode* node,
 				       std::list<std::vector<unsigned>>& offset) const;

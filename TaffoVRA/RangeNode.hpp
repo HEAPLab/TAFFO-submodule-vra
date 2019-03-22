@@ -18,7 +18,8 @@ private:
 	bool _hasRange;
 
 public:
-	VRA_RangeNode() {}
+	VRA_RangeNode()
+		: parent(nullptr), parent_offset(), range(nullptr), _hasRange(false) {}
 	VRA_RangeNode(const generic_range_ptr_t& r)
 		: parent(nullptr), parent_offset(), range(r), _hasRange(true) {}
 

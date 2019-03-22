@@ -146,7 +146,9 @@ public:
 
 	inline bool isStruct() const {return _ranges.size() > 1;}
 
-	inline generic_range_ptr_t getRangeAt(unsigned index) const {return _ranges[index];}
+	inline generic_range_ptr_t getRangeAt(unsigned index) const {
+		return (index < _ranges.size()) ? _ranges[index] : nullptr;
+	}
 
 	inline range_ptr_t toScalarRange(unsigned index = 0) const {
 		return std::dynamic_ptr_cast<range_t>(getRangeAt(index));
@@ -157,6 +159,9 @@ public:
 	}
 
 	inline void setRangeAt(unsigned index, const generic_range_ptr_t& range) {
+		if (index >= _ranges.size())
+			_ranges.resize(index + 1, nullptr);
+
 		_ranges[index] = range;
 	}
 
