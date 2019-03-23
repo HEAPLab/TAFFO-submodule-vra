@@ -66,8 +66,10 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		// retrieve info about global var v, if any
 		InputInfo *II = MDManager.retrieveInputInfo(v);
 		if (II != nullptr && isValidRange(II->IRange.get())) {
-			const llvm::Value* v_ptr = &v;
-			user_input[v_ptr] = make_range(II->IRange->Min, II->IRange->Max);
+			user_input[&v] = make_range(II->IRange->Min, II->IRange->Max);
+		} else if (StructInfo *SI = MDManager.retrieveStructInfo(v)) {
+			user_input[&v] = harvestStructMD(SI);
+			derived_ranges[&v] = new VRA_RangeNode(user_input[&v]);
 		}
 	}
 
@@ -105,13 +107,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		if (!argsII.empty()) {
 			fun_arg_input[&f] = std::list<generic_range_ptr_t>();
 			for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
-			  // TODO: struct support
-			  InputInfo *ii = dyn_cast_or_null<InputInfo>(*itII);
-			  if (ii != nullptr && isValidRange(ii->IRange.get())) {
-			    fun_arg_input[&f].push_back(make_range(ii->IRange->Min, ii->IRange->Max));
-			  } else {
-			    fun_arg_input[&f].push_back(nullptr);
-			  }
+				fun_arg_input[&f].push_back(harvestStructMD(*itII));
 			}
 		}
 
@@ -122,7 +118,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 				InputInfo *II = MDManager.retrieveInputInfo(i);
 				if (II != nullptr && isValidRange(II->IRange.get())) {
 					const llvm::Value* i_ptr = &i;
-          user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
+					user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
 				}
 				else if (StructInfo *SI = MDManager.retrieveStructInfo(i)) {
 					const llvm::Value* i_ptr = &i;
@@ -1014,7 +1010,8 @@ generic_range_ptr_t ValueRangeAnalysis::fetchRange(const VRA_RangeNode* node,
 		if (node->isScalar()) {
 			return node->getScalarRange();
 		} else if (node->isStruct()) {
-			assert(!offset.empty() && "No offset supplied.");
+			if (offset.empty())
+				return node->getStructRange();
 			range_s_ptr_t current = node->getStructRange();
 			generic_range_ptr_t child = nullptr;
 			for (auto offset_it = offset.rbegin();
@@ -1045,9 +1042,9 @@ void ValueRangeAnalysis::setRange(VRA_RangeNode* node, const generic_range_ptr_t
 		if (node->isScalar() || (!node->isStruct() && offset.empty())) {
 			const range_ptr_t scalar_info = std::static_ptr_cast<range_t>(info);
 			node->setRange(scalar_info);
+		} else if (offset.empty()) {
+			node->setRange(info);
 		} else {
-			assert(!offset.empty() && "No offset supplied.");
-
 			range_s_ptr_t parent = node->getStructRange();
 			if (parent == nullptr) {
 				parent = make_s_range();
