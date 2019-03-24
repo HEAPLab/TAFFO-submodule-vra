@@ -140,6 +140,11 @@ void ValueRangeAnalysis::processModule(Module &M)
 		f_unvisited_set.insert(&f);
 	}
 
+	if (f_unvisited_set.size() == 0) {
+		emitError("No visitable functions found");
+		return;
+	}
+  
 	// fetch initial function
 	llvm::Function* current_f = *f_unvisited_set.begin();
 
