@@ -90,13 +90,13 @@ protected:
 
 	void saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info);
 
-	VRA_RangeNode* getNode(const llvm::Value* v) const;
-	VRA_RangeNode* getOrCreateNode(const llvm::Value* v);
+	range_node_ptr_t getNode(const llvm::Value* v) const;
+	range_node_ptr_t getOrCreateNode(const llvm::Value* v);
 
-	generic_range_ptr_t fetchRange(const VRA_RangeNode* node,
+	generic_range_ptr_t fetchRange(const range_node_ptr_t node,
 				       std::list<std::vector<unsigned>>& offset) const;
 
-	void setRange(VRA_RangeNode* node, const generic_range_ptr_t& info,
+	void setRange(range_node_ptr_t node, const generic_range_ptr_t& info,
 		      std::list<std::vector<unsigned>>& offset);
 
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
@@ -106,6 +106,7 @@ protected:
         static void logInstruction(const llvm::Value* v);
         static void logRangeln(const generic_range_ptr_t& range);
         static void logInfo(const llvm::StringRef info);
+	static void logInfoln(const llvm::StringRef info);
         static void logError(const llvm::StringRef error);
 
 	// data structures
@@ -115,9 +116,9 @@ private:
 	const unsigned default_function_recursion_count = 0;
 
 	llvm::DenseMap<const llvm::Value*, generic_range_ptr_t> user_input;
-	llvm::DenseMap<const llvm::Value*, VRA_RangeNode*> derived_ranges;
+	llvm::DenseMap<const llvm::Value*, range_node_ptr_t> derived_ranges;
 	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_input;
-	llvm::DenseMap<const llvm::Function*, std::list<generic_range_ptr_t> > fun_arg_derived;
+	llvm::DenseMap<const llvm::Function*, std::list<range_node_ptr_t> > fun_arg_derived;
 	llvm::DenseMap<const llvm::Function*, unsigned> fun_rec_count;
 	llvm::DenseMap<const llvm::Loop*, unsigned> user_loop_iterations;
 	llvm::DenseMap<const llvm::Loop*, unsigned> derived_loop_iterations;

@@ -36,6 +36,11 @@ namespace std {
 			return std::shared_ptr<T>();
 		}
 	}
+	template< class T, class U >
+	bool isa_ptr( const std::shared_ptr<U>& r ) noexcept
+	{
+		return llvm::isa<T>(r.get());
+	}
 } // end namespace std
 
 namespace taffo {

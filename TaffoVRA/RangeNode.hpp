@@ -29,6 +29,8 @@ public:
 public:
 	inline const llvm::Value* getParent() const {return parent;}
 
+	inline const bool hasParent() const { return parent != nullptr; }
+
 	inline const std::vector<unsigned> getOffset() const {return parent_offset;}
 
 	inline generic_range_ptr_t getRange() const {return range;}
@@ -78,6 +80,12 @@ public:
 	}
 
 };
+
+using range_node_ptr_t = std::shared_ptr<VRA_RangeNode>;
+template<class... Args>
+static inline range_node_ptr_t make_range_node(Args&&... args) {
+  return std::make_shared<VRA_RangeNode>(std::forward<Args>(args)...);
+}
 
 // someday I will remember why I wrote it....
 static bool isStructEquivalent(const llvm::Type* type) {
