@@ -1117,15 +1117,23 @@ void ValueRangeAnalysis::logInstruction(const llvm::Value* v)
 std::string ValueRangeAnalysis::to_string(const generic_range_ptr_t& range)
 {
         if (range != nullptr) {
-	  const range_ptr_t scalar = std::dynamic_ptr_cast<range_t>(range);
-	  if (scalar != nullptr) {
-	    return "[" + std::to_string(scalar->min()) + ", "
-	      + std::to_string(scalar->max()) + "]";
-	  } else {
-	    return "struct";
-	  }
+		const range_ptr_t scalar = std::dynamic_ptr_cast<range_t>(range);
+		if (scalar != nullptr) {
+			return "[" + std::to_string(scalar->min()) + ", "
+			  + std::to_string(scalar->max()) + "]";
+		} else {
+			const range_s_ptr_t structured = std::dynamic_ptr_cast<range_s_t>(range);
+			assert(structured != nullptr);
+			std::string result("{ ");
+			for (const generic_range_ptr_t field : structured->ranges()) {
+				result.append(to_string(field));
+				result.append(", ");
+			}
+			result.append("}");
+			return result;
+		}
 	} else {
-	  return "null range!";
+		return "null range!";
 	}
 }
 

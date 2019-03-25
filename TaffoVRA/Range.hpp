@@ -116,6 +116,7 @@ static inline range_ptr_t make_range(Args&&... args) {
 
 
 struct VRA_Structured_Range;
+using range_s_t = VRA_Structured_Range;
 using range_s_ptr_t = std::shared_ptr<VRA_Structured_Range>;
 
 struct VRA_Structured_Range : VRA_Generic_Range
@@ -145,7 +146,7 @@ private:
 	std::vector<generic_range_ptr_t> _ranges;
 
 public:
-	inline const std::vector<generic_range_ptr_t> ranges() const {return _ranges; }
+	inline const std::vector<generic_range_ptr_t>& ranges() const {return _ranges; }
 
 	inline bool isScalarOrArray() const {return _ranges.size() == 1;}
 
