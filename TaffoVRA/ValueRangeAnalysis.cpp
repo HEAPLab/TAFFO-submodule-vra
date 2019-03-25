@@ -21,7 +21,6 @@ using namespace llvm;
 using namespace taffo;
 using namespace mdutils;
 
-
 char ValueRangeAnalysis::ID = 0;
 
 static RegisterPass<ValueRangeAnalysis> X(
@@ -368,7 +367,6 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 					break;
 				case llvm::Instruction::GetElementPtr:
 					tmp = handleGEPInstr(&i);
-					saveValueInfo(&i, tmp);
 					break;
 				case llvm::Instruction::Fence:
 					emitError("Handling of Fence not supported yet");
@@ -658,6 +656,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 						argsII.push_back(&newII.back());
 					}
 				}
+				// TODO: save struct metadata
 			} else {
 				// TODO set default
 			}
@@ -1059,7 +1058,8 @@ void ValueRangeAnalysis::setRange(range_node_ptr_t node, const generic_range_ptr
 {
 	if (!node || !info) return;
 	if (node->hasRange() || node->getParent() == nullptr) {
-		if (node->isScalar() || std::isa_ptr<range_t>(info)) {
+		if (node->isScalar()
+		    || (offset.empty() && std::isa_ptr<range_t>(info))) {
 			const range_ptr_t scalar_info = std::static_ptr_cast<range_t>(info);
 			node->setRange(scalar_info);
 		} else {
