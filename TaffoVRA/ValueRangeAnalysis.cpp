@@ -1055,10 +1055,8 @@ generic_range_ptr_t ValueRangeAnalysis::fetchRange(const range_node_ptr_t node,
 		if (node->isScalar()) {
 			return node->getScalarRange();
 		} else if (node->isStruct()) {
-			if (offset.empty())
-				return node->getStructRange();
 			range_s_ptr_t current = node->getStructRange();
-			generic_range_ptr_t child = nullptr;
+			generic_range_ptr_t child = current;
 			for (auto offset_it = offset.rbegin();
 			     offset_it != offset.rend(); ++offset_it) {
 				for (unsigned idx : *offset_it) {
