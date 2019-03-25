@@ -67,6 +67,8 @@ private:
 #endif
 	inline void handleCallBase(const llvm::Instruction* call);
 
+	void handleMemCpyIntrinsics(const llvm::Instruction* memcpy);
+
 	inline void handleReturn(const llvm::Instruction* ret);
 
 	void saveResults(llvm::Module &M);

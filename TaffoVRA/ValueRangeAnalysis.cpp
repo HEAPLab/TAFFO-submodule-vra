@@ -571,17 +571,43 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		}
 	} else {
 		const auto intrinsicsID = callee->getIntrinsicID();
-		if (intrinsicsID != llvm::Intrinsic::not_intrinsic) {
+		if (intrinsicsID == llvm::Intrinsic::not_intrinsic) {
 			emitError("call to unknown function " + calledFunctionName);
 			// TODO handle case of external function call
 		} else {
-			emitError("skipping intrinsic " + calledFunctionName);
+			switch (intrinsicsID) {
+				case llvm::Intrinsic::memcpy:
+					handleMemCpyIntrinsics(call_i);
+					break;
+				default:
+					emitError("skipping intrinsic " + calledFunctionName);
+			}
 			// TODO handle case of llvm intrinsics function call
 		}
 	}
 	saveValueInfo(call, res);
 	logRangeln(res);
 	return;
+}
+
+void ValueRangeAnalysis::handleMemCpyIntrinsics(const llvm::Instruction* memcpy)
+{
+	assert(isa<CallInst>(memcpy) || isa<InvokeInst>(memcpy));
+	logInfo("llvm.memcpy");
+	const BitCastInst* dest_bitcast =
+	  dyn_cast<BitCastInst>(memcpy->getOperand(0U));
+	const BitCastInst* src_bitcast =
+	  dyn_cast<BitCastInst>(memcpy->getOperand(1U));
+	if (!(dest_bitcast && src_bitcast)) {
+		logError("operand is not bitcast, aborting");
+		return;
+	}
+	const Value* dest = dest_bitcast->getOperand(0U);
+	const Value* src = src_bitcast->getOperand(0U);
+
+	const generic_range_ptr_t src_range = fetchInfo(src);
+	saveValueInfo(dest, src_range);
+	logRangeln(src_range);
 }
 
 //-----------------------------------------------------------------------------
