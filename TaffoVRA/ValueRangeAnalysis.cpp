@@ -693,6 +693,8 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		// retrieve info about instructions, for each basic block bb
 		for (auto &bb : f.getBasicBlockList()) {
 			for (auto &i : bb.getInstList()) {
+				if (isa<StoreInst>(i))
+					continue;
 				// fetch info about Instruction i, if any
 				InputInfo *II = MDManager.retrieveInputInfo(i);
 				const auto range = fetchInfo(&i);
