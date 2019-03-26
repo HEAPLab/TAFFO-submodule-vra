@@ -101,6 +101,8 @@ protected:
 	void setRange(range_node_ptr_t node, const generic_range_ptr_t& info,
 		      std::list<std::vector<unsigned>>& offset);
 
+	bool isDescendant(const llvm::Value* parent, const llvm::Value* desc) const;
+
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
 
 	static void emitError(const std::string& message);

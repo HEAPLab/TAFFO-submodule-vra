@@ -741,8 +741,11 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 
 	if (value_param->getType()->isPointerTy()) {
 		logInfoln("pointer store");
-		derived_ranges[address_param] =
-		  make_range_node(value_param, std::vector<unsigned>());
+		if (isDescendant(address_param, value_param))
+			logError("pointer circularity!");
+		else
+			derived_ranges[address_param] =
+			  make_range_node(value_param, std::vector<unsigned>());
 		return;
 	}
 
@@ -1133,6 +1136,21 @@ void ValueRangeAnalysis::setRange(range_node_ptr_t node, const generic_range_ptr
 		offset.push_back(node->getOffset());
 		setRange(getOrCreateNode(node->getParent()), info, offset);
 	}
+}
+
+bool ValueRangeAnalysis::isDescendant(const llvm::Value* parent,
+				      const llvm::Value* desc) const
+{
+	if (!(parent && desc)) return false;
+	if (parent == desc) return true;
+	range_node_ptr_t desc_node = getNode(desc);
+	while (desc_node != nullptr) {
+		desc = desc_node->getParent();
+		if (desc == parent)
+			return true;
+		desc_node = getNode(desc);
+	}
+	return false;
 }
 
 //-----------------------------------------------------------------------------
