@@ -900,17 +900,27 @@ unsigned ValueRangeAnalysis::find_recursion_count(const llvm::Function* f)
 //-----------------------------------------------------------------------------
 const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v)
 {
+	generic_range_ptr_t input_range = nullptr;
 	auto input_it = user_input.find(v);
 	if (input_it != user_input.end()) {
-	 	return input_it->second;
+		input_range = input_it->second;
+		if (std::dynamic_ptr_cast_or_null<range_t>(input_range))
+			return input_range;
 	}
 
 	if (const auto node = getNode(v)) {
 		if (node->isScalar()) {
+			assert(input_range == nullptr
+			       && "Computed range is scalar, but input range is not.");
 			return node->getRange();
 		} else {
 			std::list<std::vector<unsigned>> offset;
-			return fetchRange(node, offset);
+			const generic_range_ptr_t derived_range = fetchRange(node, offset);
+			if (input_range == nullptr)
+				return derived_range;
+			else
+				// fill null input_range fields with corresponding derived fields
+				return fillRangeHoles(input_range, derived_range);
 		}
 	}
 	const llvm::Constant* const_i = dyn_cast_or_null<llvm::Constant>(v);

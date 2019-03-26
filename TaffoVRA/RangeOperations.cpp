@@ -439,13 +439,20 @@ range_ptr_t taffo::handleBooleanOr(const range_ptr_t &op1,
 }
 
 /** deep copy of range */
+generic_range_ptr_t taffo::copyRange(const generic_range_ptr_t &op)
+{
+	if (!op) {
+		return nullptr;
+	}
+	return op->clone();
+}
+
 range_ptr_t taffo::copyRange(const range_ptr_t &op)
 {
 	if (!op) {
 		return nullptr;
 	}
-	range_ptr_t res = make_range(op->min(), op->max());
-	return res;
+	return std::static_ptr_cast<range_t>(op->clone());
 }
 
 /** create a generic boolean range */
@@ -489,4 +496,23 @@ generic_range_ptr_t taffo::getUnionRange(const generic_range_ptr_t &op1,
 	range_ptr_t sop1 = std::dynamic_ptr_cast_or_null<range_t>(op1);
 	range_ptr_t sop2 = std::dynamic_ptr_cast_or_null<range_t>(op2);
 	return getUnionRange(sop1, sop2);
+}
+
+generic_range_ptr_t taffo::fillRangeHoles(const generic_range_ptr_t &src,
+					  const generic_range_ptr_t &dst)
+{
+	if (!src) return copyRange(dst);
+	if (!dst || std::isa_ptr<range_t>(src)) {
+		return copyRange(src);
+	}
+	const range_s_ptr_t src_s = std::static_ptr_cast<range_s_t>(src);
+	const range_s_ptr_t dst_s = std::static_ptr_cast<range_s_t>(dst);
+	std::vector<generic_range_ptr_t> new_fields;
+	new_fields.reserve(src_s->getNumRanges());
+	for (unsigned i = 0; i < src_s->getNumRanges(); ++i) {
+		if (i < dst_s->getNumRanges())
+			new_fields.push_back(fillRangeHoles(src_s->getRangeAt(i),
+							    dst_s->getRangeAt(i)));
+	}
+	return make_s_range(new_fields);
 }

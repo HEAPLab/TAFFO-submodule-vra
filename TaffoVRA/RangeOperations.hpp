@@ -88,6 +88,7 @@ range_ptr_t handleBooleanOr(const range_ptr_t &op1, const range_ptr_t &op2);
 // Range helpers
 //-----------------------------------------------------------------------------
 /** deep copy of range */
+generic_range_ptr_t copyRange(const generic_range_ptr_t &op);
 range_ptr_t copyRange(const range_ptr_t &op);
 
 /** create a generic boolean range */
@@ -102,6 +103,8 @@ range_ptr_t getAlwaysTrue();
 range_ptr_t getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2);
 
 generic_range_ptr_t getUnionRange(const generic_range_ptr_t &op1, const generic_range_ptr_t &op2);
+
+generic_range_ptr_t fillRangeHoles(const generic_range_ptr_t &src, const generic_range_ptr_t &dst);
 
 }
 

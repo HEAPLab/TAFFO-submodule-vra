@@ -45,6 +45,9 @@ namespace std {
 
 namespace taffo {
 
+struct VRA_Generic_Range;
+using generic_range_ptr_t = std::shared_ptr<VRA_Generic_Range>;
+
 struct VRA_Generic_Range {
 
 	enum rangeKind {
@@ -60,9 +63,9 @@ public:
 	VRA_Generic_Range(rangeKind k) : kind(k) {}
 	VRA_Generic_Range(const VRA_Generic_Range&) = delete;
 	virtual ~VRA_Generic_Range() {};
+	virtual generic_range_ptr_t clone() const = 0;
 };
 
-using generic_range_ptr_t = std::shared_ptr<VRA_Generic_Range>;
 
 template<
 	typename num_t,
@@ -97,6 +100,10 @@ public:
 	inline const bool isConstant() const {return min() == max();}
 	inline const bool cross(const num_t val = 0.0) const {
 		return min() <= val && max() >= val;
+	}
+
+	generic_range_ptr_t clone() const override {
+		return std::make_shared<VRA_Range>(*this);
 	}
 
 	// LLVM-style RTTI stuff
@@ -152,6 +159,8 @@ public:
 
 	inline bool isStruct() const {return _ranges.size() > 1;}
 
+	inline unsigned getNumRanges() const { return _ranges.size(); }
+
 	inline generic_range_ptr_t getRangeAt(unsigned index) const {
 		return (index < _ranges.size()) ? _ranges[index] : nullptr;
 	}
@@ -169,6 +178,10 @@ public:
 			_ranges.resize(index + 1, nullptr);
 
 		_ranges[index] = range;
+	}
+
+	generic_range_ptr_t clone() const override {
+		return std::make_shared<VRA_Structured_Range>(*this);
 	}
 
 	// LLVM-style RTTI stuff
