@@ -1,6 +1,6 @@
 #include <string>
 #include <list>
-#include <math.h>
+#include <cmath>
 #include <cassert>
 #include <limits>
 #include "Range.hpp"

@@ -9,9 +9,6 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/Analysis/AssumptionCache.h"
-#include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Support/Debug.h"
 
@@ -43,9 +40,6 @@ bool ValueRangeAnalysis::runOnModule(Module &M)
 void ValueRangeAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequiredTransitive<DominatorTreeWrapperPass>();
   AU.addRequiredTransitive<LoopInfoWrapperPass>();
-  AU.addRequiredTransitive<AssumptionCacheTracker>();
-  AU.addRequiredTransitive<ScalarEvolutionWrapperPass>();
-  AU.addRequiredTransitive<OptimizationRemarkEmitterWrapperPass>();
   AU.addRequiredTransitive<MemorySSAWrapperPass>();
   AU.setPreservesAll();
 }
