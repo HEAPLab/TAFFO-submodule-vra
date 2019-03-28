@@ -630,92 +630,106 @@ void ValueRangeAnalysis::handleReturn(const llvm::Instruction* ret)
 void ValueRangeAnalysis::saveResults(llvm::Module &M)
 {
 	MetadataManager &MDManager = MetadataManager::getMetadataManager();
-	for (auto &v : M.globals()) {
-		// retrieve info about global var v, if any
-		InputInfo *II = MDManager.retrieveInputInfo(v);
-		if (II != nullptr) {
-			const auto range = fetchInfo(&v);
-			if (range != nullptr) {
-				const range_ptr_t scalar =
-				  std::dynamic_ptr_cast<range_t>(range);
-				if (scalar != nullptr) {
-					II->IRange.reset(new Range(scalar->min(), scalar->max()));
-					MDManager.setInputInfoMetadata(v, *II);
-				}
+	for (GlobalVariable &v : M.globals()) {
+		const generic_range_ptr_t range = fetchInfo(&v);
+		if (range != nullptr) {
+			// retrieve info about global var v, if any
+			if (MDInfo *mdi = MDManager.retrieveMDInfo(&v)) {
+				std::shared_ptr<MDInfo> cpymdi(mdi->clone());
+				updateMDInfo(cpymdi, range);
+				MDManager.setMDInfoMetadata(&v, cpymdi.get());
 			} else {
-				// TODO set default
+				std::shared_ptr<MDInfo> newmdi = toMDInfo(range);
+				MDManager.setMDInfoMetadata(&v, newmdi.get());
 			}
 		}
 	} // end globals
 
-	for (auto &f : M.functions()) {
-
+	for (Function &f : M.functions()) {
 		// arg range
-		SmallVector<mdutils::MDInfo*, 5> argsII;
+		SmallVector<MDInfo*, 5U> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
-		std::list<InputInfo> newII;
+		SmallVector<std::shared_ptr<MDInfo>, 5U> newII;
+		newII.reserve(f.arg_size());
 		auto argsIt = argsII.begin();
 		for (Argument &arg : f.args()) {
-			const auto range = fetchInfo(&arg);
+			const generic_range_ptr_t range = fetchInfo(&arg);
 			if (range != nullptr) {
-				const range_ptr_t scalar =
-				  std::dynamic_ptr_cast<range_t>(range);
-				if (scalar != nullptr) {
-			  		std::shared_ptr<Range> newRange =
-					  std::make_shared<Range>(scalar->min(), scalar->max());
-					if (argsIt != argsII.end()) {
-						if (*argsIt != nullptr) {
-							InputInfo *ii = cast<InputInfo>(*argsIt);
-							ii->IRange.swap(newRange);
-						} else {
-							newII.push_back(InputInfo(nullptr, newRange, nullptr));
-							*argsIt = &newII.back();
-						}
-					} else {
-						newII.push_back(InputInfo(nullptr, newRange, nullptr));
-						argsII.push_back(&newII.back());
-					}
+				if (argsIt != argsII.end() && *argsIt != nullptr) {
+					std::shared_ptr<MDInfo> cpymdi((*argsIt)->clone());
+					updateMDInfo(cpymdi, range);
+					newII.push_back(cpymdi);
+					*argsIt = cpymdi.get();
+				} else {
+					std::shared_ptr<MDInfo> newmdi = toMDInfo(range);
+					newII.push_back(newmdi);
+					*argsIt = newmdi.get();
 				}
-				// TODO: save struct metadata
-			} else {
-				// TODO set default
 			}
-			argsIt++;
+			++argsIt;
 		}
 		MDManager.setArgumentInputInfoMetadata(f, argsII);
 
 		// retrieve info about instructions, for each basic block bb
-		for (auto &bb : f.getBasicBlockList()) {
-			for (auto &i : bb.getInstList()) {
+		for (BasicBlock &bb : f.getBasicBlockList()) {
+			for (Instruction &i : bb.getInstList()) {
 				if (isa<StoreInst>(i))
 					continue;
-				// fetch info about Instruction i, if any
-				InputInfo *II = MDManager.retrieveInputInfo(i);
-				const auto range = fetchInfo(&i);
-				const range_ptr_t scalar =
-				  std::dynamic_ptr_cast_or_null<range_t>(range);
-				if (scalar != nullptr) {
-				  if (II != nullptr) {
-				    if (scalar != nullptr) {
-				      II->IRange.reset(new Range(scalar->min(), scalar->max()));
-				      MDManager.setInputInfoMetadata(i, *II);
-				    } else {
-				      // TODO set default
-				    }
-				  } else {
-				    if (scalar != nullptr) {
-				      InputInfo NewII;
-				      NewII.IRange.reset(new Range(scalar->min(), scalar->max()));
-				      MDManager.setInputInfoMetadata(i, NewII);
-				    } else {
-				      // TODO set default
-				    }
-				  }
+				const generic_range_ptr_t range = fetchInfo(&i);
+				if (range != nullptr) {
+					MDInfo *mdi = MDManager.retrieveMDInfo(&i);
+					if (mdi != nullptr) {
+						std::shared_ptr<MDInfo> cpymdi(mdi->clone());
+						updateMDInfo(cpymdi, range);
+						MDManager.setMDInfoMetadata(&i, cpymdi.get());
+					} else {
+						std::shared_ptr<MDInfo> newmdi = toMDInfo(range);
+						MDManager.setMDInfoMetadata(&i, newmdi.get());
+					}
 				}
-			} // end inst list
+			} // end instruction
 		} // end bb
 	} // end function
 	return;
+}
+
+std::shared_ptr<mdutils::MDInfo> ValueRangeAnalysis::toMDInfo(const generic_range_ptr_t &r)
+{
+	if (r == nullptr) return nullptr;
+	if (const range_ptr_t scalar = std::dynamic_ptr_cast<range_t>(r)) {
+		return std::make_shared<InputInfo>(nullptr,
+						   std::make_shared<Range>(scalar->min(), scalar->max()),
+						   nullptr);
+	} else if (const range_s_ptr_t structr = std::dynamic_ptr_cast<range_s_t>(r)) {
+		SmallVector<std::shared_ptr<mdutils::MDInfo>, 4U> fields;
+		fields.reserve(structr->getNumRanges());
+		for (const generic_range_ptr_t f : structr->ranges())
+			fields.push_back(toMDInfo(f));
+		return std::make_shared<StructInfo>(fields);
+	}
+	llvm_unreachable("Unknown range type.");
+}
+
+void ValueRangeAnalysis::updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
+				      const generic_range_ptr_t &r)
+{
+	if (mdi == nullptr || r == nullptr) return;
+	if (const range_ptr_t scalar = std::dynamic_ptr_cast<range_t>(r)) {
+		std::shared_ptr<InputInfo> ii = std::static_ptr_cast<InputInfo>(mdi);
+		ii->IRange.reset(new Range(scalar->min(), scalar->max()));
+		return;
+	} else if (const range_s_ptr_t structr = std::dynamic_ptr_cast<range_s_t>(r)) {
+		std::shared_ptr<StructInfo> si = std::static_ptr_cast<StructInfo>(mdi);
+		auto derfield_it = structr->ranges().begin();
+		auto derfield_end = structr->ranges().end();
+		for (std::shared_ptr<mdutils::MDInfo> mdfield : *si) {
+			if (derfield_it == derfield_end) break;
+			updateMDInfo(mdfield, *derfield_it);
+			++derfield_it;
+		}
+		return;
+	}
+	llvm_unreachable("Unknown range type.");
 }
 
 
