@@ -209,7 +209,8 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	     formal_arg != F.arg_end();
 	     ++formal_arg) {
 		generic_range_ptr_t info = nullptr;
-		if (has_input_info && *input_info_it != nullptr) {
+		if (!formal_arg->getType()->isPointerTy()
+		    && has_input_info && *input_info_it != nullptr) {
 			info = *input_info_it;
 			saveValueInfo(formal_arg, info);
 		} else if (has_derived_info && *derived_info_it != nullptr) {
