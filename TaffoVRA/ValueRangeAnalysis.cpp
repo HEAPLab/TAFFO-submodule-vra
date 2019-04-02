@@ -1086,8 +1086,10 @@ generic_range_ptr_t ValueRangeAnalysis::fetchRange(const range_node_ptr_t node,
 					child = current->getRangeAt(idx);
 					current = std::dynamic_ptr_cast_or_null<VRA_Structured_Range>(child);
 					if (!current)
-					  break;
+						break;
 				}
+				if (!current)
+					break;
 			}
 			return child;
 		}
