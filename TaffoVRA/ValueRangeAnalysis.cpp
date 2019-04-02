@@ -804,7 +804,7 @@ generic_range_ptr_t ValueRangeAnalysis::handleGEPInstr(const llvm::Instruction* 
 	if (node != nullptr) {
 		if (node->hasRange())
 			return node->getRange();
-		logInfoln("has range");
+		logInfoln("has node");
 	} else {
 		DEBUG(dbgs() << "indices: ");
 		Type* t = gep_i->getSourceElementType();
@@ -1110,28 +1110,30 @@ void ValueRangeAnalysis::setRange(range_node_ptr_t node, const generic_range_ptr
 			const range_ptr_t scalar_info = std::static_ptr_cast<range_t>(info);
 			node->setRange(scalar_info);
 		} else {
-			range_s_ptr_t parent = node->getStructRange();
-			if (parent == nullptr) {
-				parent = make_s_range();
-				node->setStructRange(parent);
+			range_s_ptr_t child = node->getStructRange();
+			if (child == nullptr) {
+				child = make_s_range();
+				node->setStructRange(child);
 			}
 
-			range_s_ptr_t child = nullptr;
+			range_s_ptr_t parent = nullptr;
 		        int child_idx = -1;
 			for (auto offset_it = offset.rbegin();
 			     offset_it != offset.rend(); ++offset_it) {
 				for (unsigned idx : *offset_it) {
-					child_idx = idx;
-					generic_range_ptr_t gen_child = parent->getRangeAt(idx);
-					if (gen_child == nullptr) {
-						child = make_s_range();
-						parent->setRangeAt(idx, child);
-					} else {
-						child = std::dynamic_ptr_cast<VRA_Structured_Range>(gen_child);
-						if (child == nullptr)
-						  break;
-					}
 					parent = child;
+					if (child_idx > -1) {
+						generic_range_ptr_t gen_child = parent->getRangeAt(child_idx);
+						if (gen_child == nullptr) {
+							child = make_s_range();
+							parent->setRangeAt(idx, child);
+						} else {
+							child = std::dynamic_ptr_cast<VRA_Structured_Range>(gen_child);
+							if (child == nullptr)
+								break;
+						}
+					}
+					child_idx = idx;
 				}
 			}
 			if (child_idx == -1)
