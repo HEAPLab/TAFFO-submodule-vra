@@ -1119,17 +1119,16 @@ void ValueRangeAnalysis::setRange(range_node_ptr_t node, const generic_range_ptr
 				node->setStructRange(child);
 			}
 
-			range_s_ptr_t parent = nullptr;
+			range_s_ptr_t parent = child;
 		        int child_idx = -1;
 			for (auto offset_it = offset.rbegin();
 			     offset_it != offset.rend(); ++offset_it) {
 				for (unsigned idx : *offset_it) {
-					parent = child;
 					if (child_idx > -1) {
 						generic_range_ptr_t gen_child = parent->getRangeAt(child_idx);
 						if (gen_child == nullptr) {
 							child = make_s_range();
-							parent->setRangeAt(idx, child);
+							parent->setRangeAt(child_idx, child);
 						} else {
 							child = std::dynamic_ptr_cast<VRA_Structured_Range>(gen_child);
 							if (child == nullptr)
@@ -1137,6 +1136,7 @@ void ValueRangeAnalysis::setRange(range_node_ptr_t node, const generic_range_ptr
 						}
 					}
 					child_idx = idx;
+					parent = child;
 				}
 			}
 			if (child_idx == -1)
