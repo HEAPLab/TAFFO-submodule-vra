@@ -60,6 +60,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		InputInfo *II = MDManager.retrieveInputInfo(v);
 		if (II != nullptr && isValidRange(II->IRange.get())) {
 			user_input[&v] = make_range(II->IRange->Min, II->IRange->Max);
+			derived_ranges[&v] = make_range_node(user_input[&v]);
 		} else if (StructInfo *SI = MDManager.retrieveStructInfo(v)) {
 			user_input[&v] = harvestStructMD(SI);
 			derived_ranges[&v] = make_range_node(user_input[&v]);
