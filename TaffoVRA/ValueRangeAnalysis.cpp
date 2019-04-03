@@ -808,30 +808,43 @@ generic_range_ptr_t ValueRangeAnalysis::handleGEPInstr(const llvm::Instruction* 
 			return node->getRange();
 		logInfoln("has node");
 	} else {
-		DEBUG(dbgs() << "indices: ");
-		Type* t = gep_i->getSourceElementType();
 		std::vector<unsigned> offset;
-		for (auto idx_it = gep_i->idx_begin() + 1; // skip first index
-		     idx_it != gep_i->idx_end(); ++idx_it) {
-			if (isa<SequentialType>(t))
-				continue;
-			const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(*idx_it);
-			if (int_i) {
-				int n = static_cast<int>(int_i->getSExtValue());
-				offset.push_back(n);
-				t = cast<StructType>(t)->getTypeAtIndex(n);
-				DEBUG(dbgs() << n << " ");
-			} else {
-				emitError("Index of GEP not constant");
-				return nullptr;
-			}
-		}
-		DEBUG(dbgs() << "\n");
+		if (!extractGEPOffset(gep_i->getSourceElementType(),
+				      iterator_range<User::const_op_iterator>(gep_i->idx_begin(),
+									      gep_i->idx_end()),
+				      offset))
+			return nullptr;
 		node = make_range_node(gep_i->getPointerOperand(), offset);
 		derived_ranges[gep] = node;
 	}
 
 	return fetchInfo(gep_i);
+}
+
+bool ValueRangeAnalysis::extractGEPOffset(const llvm::Type* source_element_type,
+					  const llvm::iterator_range<llvm::User::const_op_iterator> indices,
+					  std::vector<unsigned>& offset)
+{
+	assert(source_element_type != nullptr);
+	DEBUG(dbgs() << "indices: ");
+	for (auto idx_it = indices.begin() + 1; // skip first index
+		idx_it != indices.end(); ++idx_it) {
+		if (isa<SequentialType>(source_element_type))
+			continue;
+		const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(*idx_it);
+		if (int_i) {
+			int n = static_cast<int>(int_i->getSExtValue());
+			offset.push_back(n);
+			source_element_type =
+			  cast<StructType>(source_element_type)->getTypeAtIndex(n);
+			DEBUG(dbgs() << n << " ");
+		} else {
+			emitError("Index of GEP not constant");
+			return false;
+		}
+	}
+	DEBUG(dbgs() << "\n");
+	return true;
 }
 
 
@@ -1063,11 +1076,26 @@ range_node_ptr_t ValueRangeAnalysis::getNode(const llvm::Value* v) const
 range_node_ptr_t ValueRangeAnalysis::getOrCreateNode(const llvm::Value* v)
 {
 	range_node_ptr_t ret = getNode(v);
-	if (ret == nullptr
-	    && (isa<AllocaInst>(v) || isa<GlobalVariable>(v) || isa<Argument>(v))) {
-	    	// create root node
-		ret = make_range_node();
-		derived_ranges[v] = ret;
+	if (ret == nullptr) {
+		if (isa<AllocaInst>(v) || isa<GlobalVariable>(v) || isa<Argument>(v)) {
+			// create root node
+			ret = make_range_node();
+			derived_ranges[v] = ret;
+		} else if (const ConstantExpr* ce = dyn_cast<ConstantExpr>(v)) {
+			if (ce->isGEPWithNoNotionalOverIndexing()) {
+				Value* pointer_op = ce->getOperand(0U);
+				Type* source_element_type =
+				  cast<PointerType>(pointer_op->getType()->getScalarType())->getElementType();
+				std::vector<unsigned> offset;
+				if (extractGEPOffset(source_element_type,
+						     iterator_range<User::const_op_iterator>(ce->op_begin()+1,
+											     ce->op_end()),
+						     offset)) {
+					ret = make_range_node(pointer_op, offset);
+					derived_ranges[v] = ret;
+				}
+			}
+		}
 	}
 	return ret;
 }

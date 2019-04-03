@@ -102,6 +102,10 @@ protected:
 		      std::list<std::vector<unsigned>>& offset);
 
 	bool isDescendant(const llvm::Value* parent, const llvm::Value* desc) const;
+	bool extractGEPOffset(const llvm::Type* source_element_type,
+			      const llvm::iterator_range<llvm::User::const_op_iterator> indices,
+			      std::vector<unsigned>& offset);
+
 
 	static inline range_ptr_t fetchConstant(const llvm::Constant* v);
 
