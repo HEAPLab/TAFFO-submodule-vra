@@ -564,12 +564,12 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		if (res_it != return_values.end()) {
 		  res = res_it->second;
 		} else {
-		  logError("function " + calledFunctionName + " returns nothing");
+		  logInfo("function " + calledFunctionName + " returns nothing");
 		}
 	} else {
 		const auto intrinsicsID = callee->getIntrinsicID();
 		if (intrinsicsID == llvm::Intrinsic::not_intrinsic) {
-			emitError("call to unknown function " + calledFunctionName);
+			logInfo("call to unknown function " + calledFunctionName);
 			// TODO handle case of external function call
 		} else {
 			switch (intrinsicsID) {
@@ -577,7 +577,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 					handleMemCpyIntrinsics(call_i);
 					break;
 				default:
-					emitError("skipping intrinsic " + calledFunctionName);
+					logInfo("skipping intrinsic " + calledFunctionName);
 			}
 			// TODO handle case of llvm intrinsics function call
 		}
