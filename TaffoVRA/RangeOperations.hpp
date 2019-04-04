@@ -63,6 +63,9 @@ range_ptr_t handleAShr(const range_ptr_t &op1, const range_ptr_t &op2);
 //-----------------------------------------------------------------------------
 // Cast
 //-----------------------------------------------------------------------------
+/** Trunc */
+range_ptr_t handleTrunc(const range_ptr_t &gop, const llvm::Type *dest);
+
 /** Cast To Unsigned Integer */
 range_ptr_t handleCastToUI(const range_ptr_t &op);
 

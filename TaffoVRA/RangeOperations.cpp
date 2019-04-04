@@ -4,8 +4,8 @@
 #include <assert.h>
 #include <limits>
 #include <map>
-//#include <memory>
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APSInt.h"
 
 using namespace taffo;
 
@@ -80,7 +80,8 @@ generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
 {
   const range_ptr_t scalar = std::dynamic_ptr_cast_or_null<range_t>(op);
   switch (OpCode) {
-		case llvm::Instruction::Trunc: // TODO implement
+		case llvm::Instruction::Trunc:
+			return handleTrunc(scalar, dest);
 			break;
 		case llvm::Instruction::ZExt:
 		case llvm::Instruction::SExt:
@@ -335,6 +336,29 @@ range_ptr_t taffo::handleAShr(const range_ptr_t &op1, const range_ptr_t &op2)
 	const long op_max = static_cast<long>(op2->max());
 	return make_range(static_cast<num_t>(op_min >> ((op_min > 0) ? sh_max : sh_min)),
 			  static_cast<num_t>(op_max >> ((op_max > 0) ? sh_min : sh_max)));
+}
+
+/** Trunc */
+range_ptr_t taffo::handleTrunc(const range_ptr_t &op,
+			       const llvm::Type *dest)
+{
+	using namespace llvm;
+	if (!op)
+		return nullptr;
+	const IntegerType *itype = cast<IntegerType>(dest);
+
+	APSInt imin(64U, true), imax(64U, true);
+	bool isExact;
+	APFloat(op->min()).convertToInteger(imin,
+					    llvm::APFloatBase::roundingMode::rmTowardNegative,
+					    &isExact);
+	APFloat(op->max()).convertToInteger(imax,
+					    llvm::APFloatBase::roundingMode::rmTowardPositive,
+					    &isExact);
+	APSInt new_imin(imin.trunc(itype->getBitWidth()));
+	APSInt new_imax(imax.trunc(itype->getBitWidth()));
+
+	return make_range(new_imin.getExtValue(), new_imax.getExtValue());
 }
 
 /** CastToUInteger */
