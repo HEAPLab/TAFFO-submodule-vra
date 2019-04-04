@@ -4,6 +4,7 @@ add_llvm_loadable_module(TaffoVRA
   RangeOperations.cpp
   RangeOperations.hpp
   Range.hpp
+  RangeNode.hpp
   ValueRangeAnalysis.cpp
   ValueRangeAnalysis.hpp
   MemSSAUtils.cpp

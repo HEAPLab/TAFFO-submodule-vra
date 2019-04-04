@@ -1,6 +1,7 @@
 #include <string>
 #include <list>
 #include <cmath>
+#include <cstdlib>
 #include <cassert>
 #include <limits>
 #include "Range.hpp"
@@ -166,6 +167,12 @@ static range_ptr_t handleCallToTanh(const std::list<range_ptr_t>& operands)
 	return nullptr;
 }
 
+static range_ptr_t handleCallToRand(const std::list<range_ptr_t>& operands)
+{
+	// FIXME: RAND_MAX is implementation defined!
+	return make_range(0, RAND_MAX);
+}
+
 const std::map<const std::string, map_value_t> taffo::functionWhiteList =
 {
 	CMATH_WHITELIST_FUN("ceil",  &handleCallToCeil),
@@ -180,4 +187,5 @@ const std::map<const std::string, map_value_t> taffo::functionWhiteList =
 	CMATH_WHITELIST_FUN("cos",   &handleCallToCos),
 	CMATH_WHITELIST_FUN("acos",  &handleCallToAcos),
 	CMATH_WHITELIST_FUN("tanh",  &handleCallToTanh),
+	CMATH_WHITELIST_FUN("rand",  &handleCallToRand)
 };

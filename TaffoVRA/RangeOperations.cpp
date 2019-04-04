@@ -5,6 +5,7 @@
 #include <limits>
 #include <map>
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APSInt.h"
 
 using namespace taffo;
 
@@ -73,41 +74,43 @@ range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
 #endif
 
 /** Cast instructions */
-range_ptr_t taffo::handleCastInstruction(const range_ptr_t &op,
-                                         const unsigned OpCode,
-					 const llvm::Type *dest)
+generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
+						 const unsigned OpCode,
+						 const llvm::Type *dest)
 {
+  const range_ptr_t scalar = std::dynamic_ptr_cast_or_null<range_t>(op);
   switch (OpCode) {
-		case llvm::Instruction::Trunc: // TODO implement
+		case llvm::Instruction::Trunc:
+			return handleTrunc(scalar, dest);
 			break;
 		case llvm::Instruction::ZExt:
 		case llvm::Instruction::SExt:
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		case llvm::Instruction::FPToUI:
-			return handleCastToUI(op);
+			return handleCastToUI(scalar);
 			break;
 		case llvm::Instruction::FPToSI:
-			return handleCastToSI(op);
+			return handleCastToSI(scalar);
 			break;
 		case llvm::Instruction::UIToFP:
 		case llvm::Instruction::SIToFP:
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		case llvm::Instruction::FPTrunc:
-		  	return handleFPTrunc(op, dest);
+		  	return handleFPTrunc(scalar, dest);
 		case llvm::Instruction::FPExt:
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		case llvm::Instruction::PtrToInt:
 		case llvm::Instruction::IntToPtr:
-			return handleCastToSI(op);
+			return handleCastToSI(scalar);
 			break;
 		case llvm::Instruction::BitCast: // TODO check
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		case llvm::Instruction::AddrSpaceCast:
-			return copyRange(op);
+			return copyRange(scalar);
 			break;
 		default:
 			assert(false); // unsupported operation
@@ -128,8 +131,8 @@ range_ptr_t taffo::handleMathCallInstruction(const std::list<range_ptr_t>& ops,
 }
 
 /** Handle call to known math functions. Return nullptr if unknown */
-range_ptr_t taffo::handleCompare(const std::list<range_ptr_t>& ops,
-                                 const llvm::CmpInst::Predicate pred)
+generic_range_ptr_t taffo::handleCompare(const std::list<generic_range_ptr_t>& ops,
+                                         const llvm::CmpInst::Predicate pred)
 {
 	switch (pred) {
 		case llvm::CmpInst::Predicate::FCMP_FALSE:
@@ -145,8 +148,8 @@ range_ptr_t taffo::handleCompare(const std::list<range_ptr_t>& ops,
 	assert(ops.size() <= 2 && "too many operators in compare instruction");
 
 	// extract values for easy access
-	range_ptr_t lhs = ops.front();
-	range_ptr_t rhs = ops.back();
+	range_ptr_t lhs = std::dynamic_ptr_cast_or_null<range_t>(ops.front());
+	range_ptr_t rhs = std::dynamic_ptr_cast_or_null<range_t>(ops.back());
 	// if unavailable data, nothing can be said
 	if (!lhs || !rhs) {
 		return getGenericBoolRange();
@@ -335,6 +338,29 @@ range_ptr_t taffo::handleAShr(const range_ptr_t &op1, const range_ptr_t &op2)
 			  static_cast<num_t>(op_max >> ((op_max > 0) ? sh_min : sh_max)));
 }
 
+/** Trunc */
+range_ptr_t taffo::handleTrunc(const range_ptr_t &op,
+			       const llvm::Type *dest)
+{
+	using namespace llvm;
+	if (!op)
+		return nullptr;
+	const IntegerType *itype = cast<IntegerType>(dest);
+
+	APSInt imin(64U, true), imax(64U, true);
+	bool isExact;
+	APFloat(op->min()).convertToInteger(imin,
+					    llvm::APFloatBase::roundingMode::rmTowardNegative,
+					    &isExact);
+	APFloat(op->max()).convertToInteger(imax,
+					    llvm::APFloatBase::roundingMode::rmTowardPositive,
+					    &isExact);
+	APSInt new_imin(imin.trunc(itype->getBitWidth()));
+	APSInt new_imax(imax.trunc(itype->getBitWidth()));
+
+	return make_range(new_imin.getExtValue(), new_imax.getExtValue());
+}
+
 /** CastToUInteger */
 range_ptr_t taffo::handleCastToUI(const range_ptr_t &op)
 {
@@ -358,17 +384,17 @@ range_ptr_t taffo::handleCastToSI(const range_ptr_t &op)
 }
 
 /** FPTrunc */
-range_ptr_t taffo::handleFPTrunc(const range_ptr_t &op,
+range_ptr_t taffo::handleFPTrunc(const range_ptr_t &gop,
 				 const llvm::Type *dest)
 {
-	if (!op) {
+	if (!gop) {
 		return nullptr;
 	}
 	assert(dest && dest->isFloatingPointTy()
 	       && "Non-floating-point destination Type.");
 
-	llvm::APFloat apmin(op->min());
-	llvm::APFloat apmax(op->max());
+	llvm::APFloat apmin(gop->min());
+	llvm::APFloat apmax(gop->max());
 	// Convert with most conservative rounding mode
 	bool losesInfo;
 	apmin.convert(dest->getFltSemantics(),
@@ -437,13 +463,20 @@ range_ptr_t taffo::handleBooleanOr(const range_ptr_t &op1,
 }
 
 /** deep copy of range */
+generic_range_ptr_t taffo::copyRange(const generic_range_ptr_t &op)
+{
+	if (!op) {
+		return nullptr;
+	}
+	return op->clone();
+}
+
 range_ptr_t taffo::copyRange(const range_ptr_t &op)
 {
 	if (!op) {
 		return nullptr;
 	}
-	range_ptr_t res = make_range(op->min(), op->max());
-	return res;
+	return std::static_ptr_cast<range_t>(op->clone());
 }
 
 /** create a generic boolean range */
@@ -479,4 +512,31 @@ range_ptr_t taffo::getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2)
 	const num_t min = std::min({op1->min(), op2->min()});
 	const num_t max = std::max({op1->max(), op2->max()});
 	return make_range(min, max);
+}
+
+generic_range_ptr_t taffo::getUnionRange(const generic_range_ptr_t &op1,
+					 const generic_range_ptr_t &op2)
+{
+	range_ptr_t sop1 = std::dynamic_ptr_cast_or_null<range_t>(op1);
+	range_ptr_t sop2 = std::dynamic_ptr_cast_or_null<range_t>(op2);
+	return getUnionRange(sop1, sop2);
+}
+
+generic_range_ptr_t taffo::fillRangeHoles(const generic_range_ptr_t &src,
+					  const generic_range_ptr_t &dst)
+{
+	if (!src) return copyRange(dst);
+	if (!dst || std::isa_ptr<range_t>(src)) {
+		return copyRange(src);
+	}
+	const range_s_ptr_t src_s = std::static_ptr_cast<range_s_t>(src);
+	const range_s_ptr_t dst_s = std::static_ptr_cast<range_s_t>(dst);
+	std::vector<generic_range_ptr_t> new_fields;
+	new_fields.reserve(src_s->getNumRanges());
+	for (unsigned i = 0; i < src_s->getNumRanges(); ++i) {
+		if (i < dst_s->getNumRanges())
+			new_fields.push_back(fillRangeHoles(src_s->getRangeAt(i),
+							    dst_s->getRangeAt(i)));
+	}
+	return make_s_range(new_fields);
 }

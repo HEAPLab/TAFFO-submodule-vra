@@ -25,16 +25,16 @@ range_ptr_t handleUnaryInstruction(const range_ptr_t &op,
 #endif
 
 /** Handle cast instructions */
-range_ptr_t handleCastInstruction(const range_ptr_t &op,
-                                  const unsigned OpCode,
-				  const llvm::Type *dest);
+generic_range_ptr_t handleCastInstruction(const generic_range_ptr_t &op,
+					  const unsigned OpCode,
+					  const llvm::Type *dest);
 
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
                                       const std::string &function);
 
-range_ptr_t handleCompare(const std::list<range_ptr_t>& ops,
-                          const llvm::CmpInst::Predicate pred);
+generic_range_ptr_t handleCompare(const std::list<generic_range_ptr_t>& ops,
+                                  const llvm::CmpInst::Predicate pred);
 
 //-----------------------------------------------------------------------------
 // Arithmetic
@@ -63,6 +63,9 @@ range_ptr_t handleAShr(const range_ptr_t &op1, const range_ptr_t &op2);
 //-----------------------------------------------------------------------------
 // Cast
 //-----------------------------------------------------------------------------
+/** Trunc */
+range_ptr_t handleTrunc(const range_ptr_t &gop, const llvm::Type *dest);
+
 /** Cast To Unsigned Integer */
 range_ptr_t handleCastToUI(const range_ptr_t &op);
 
@@ -88,6 +91,7 @@ range_ptr_t handleBooleanOr(const range_ptr_t &op1, const range_ptr_t &op2);
 // Range helpers
 //-----------------------------------------------------------------------------
 /** deep copy of range */
+generic_range_ptr_t copyRange(const generic_range_ptr_t &op);
 range_ptr_t copyRange(const range_ptr_t &op);
 
 /** create a generic boolean range */
@@ -100,6 +104,10 @@ range_ptr_t getAlwaysFalse();
 range_ptr_t getAlwaysTrue();
 
 range_ptr_t getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2);
+
+generic_range_ptr_t getUnionRange(const generic_range_ptr_t &op1, const generic_range_ptr_t &op2);
+
+generic_range_ptr_t fillRangeHoles(const generic_range_ptr_t &src, const generic_range_ptr_t &dst);
 
 }
 
