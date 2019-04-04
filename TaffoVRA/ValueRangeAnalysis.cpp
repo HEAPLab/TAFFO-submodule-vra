@@ -511,6 +511,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	std::list<range_ptr_t> arg_scalar_ranges;
 	for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
 	{
+		if (isa<Constant>(*arg_it)) fetchInfo(*arg_it);
 		arg_ranges.push_back(getOrCreateNode(*arg_it));
 		if (const generic_range_ptr_t arg_info = fetchInfo(*arg_it)) {
 			const range_ptr_t arg_info_scalar = std::dynamic_ptr_cast<range_t>(arg_info);
@@ -941,7 +942,7 @@ const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v)
 			assert(input_range == nullptr
 			       && "Computed range is scalar, but input range is not.");
 			return node->getRange();
-		} else {
+		} else if (v->getType()->isPointerTy()) {
 			std::list<std::vector<unsigned>> offset;
 			const generic_range_ptr_t derived_range = fetchRange(node, offset);
 			if (input_range == nullptr)
