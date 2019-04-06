@@ -157,8 +157,24 @@ static range_ptr_t handleCallToCos(const std::list<range_ptr_t>& operands)
 
 static range_ptr_t handleCallToAcos(const std::list<range_ptr_t>& operands)
 {
-	// TODO implement
-	return nullptr;
+	assert(operands.size() == 1 && "too many operands in function acos");
+	range_ptr_t op = operands.front();
+	if (!op) {
+		return nullptr;
+	}
+	return make_range(std::acos(std::max(op->min(), -1.0)),
+			  std::acos(std::min(op->max(), 1.0)));
+}
+
+static range_ptr_t handleCallToAsin(const std::list<range_ptr_t>& operands)
+{
+	assert(operands.size() == 1 && "too many operands in function asin");
+	range_ptr_t op = operands.front();
+	if (!op) {
+		return nullptr;
+	}
+	return make_range(std::asin(std::max(op->min(), -1.0)),
+			  std::asin(std::min(op->max(), 1.0)));
 }
 
 static range_ptr_t handleCallToTanh(const std::list<range_ptr_t>& operands)
@@ -186,6 +202,7 @@ const std::map<const std::string, map_value_t> taffo::functionWhiteList =
 	CMATH_WHITELIST_FUN("sin",   &handleCallToSin),
 	CMATH_WHITELIST_FUN("cos",   &handleCallToCos),
 	CMATH_WHITELIST_FUN("acos",  &handleCallToAcos),
+	CMATH_WHITELIST_FUN("asin",  &handleCallToAsin),
 	CMATH_WHITELIST_FUN("tanh",  &handleCallToTanh),
 	CMATH_WHITELIST_FUN("rand",  &handleCallToRand)
 };
