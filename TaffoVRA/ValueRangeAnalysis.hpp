@@ -72,6 +72,7 @@ private:
 	inline void handleReturn(const llvm::Instruction* ret);
 
 	void saveResults(llvm::Module &M);
+	inline void refreshRange(const llvm::Instruction* i);
 
 	inline void handleStoreInstr(const llvm::Instruction* store);
 

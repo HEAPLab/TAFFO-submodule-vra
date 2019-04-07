@@ -683,6 +683,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 			for (Instruction &i : bb.getInstList()) {
 				if (isa<StoreInst>(i))
 					continue;
+				refreshRange(&i);
 				const generic_range_ptr_t range = fetchInfo(&i);
 				if (range != nullptr) {
 					MDInfo *mdi = MDManager.retrieveMDInfo(&i);
@@ -699,6 +700,14 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		} // end bb
 	} // end function
 	return;
+}
+
+void ValueRangeAnalysis::refreshRange(const llvm::Instruction* i)
+{
+	if (const LoadInst* li = dyn_cast_or_null<LoadInst>(i)) {
+		const generic_range_ptr_t newInfo = fetchInfo(li->getPointerOperand());
+		saveValueInfo(li, newInfo);
+	}
 }
 
 std::shared_ptr<mdutils::MDInfo> ValueRangeAnalysis::toMDInfo(const generic_range_ptr_t &r)
