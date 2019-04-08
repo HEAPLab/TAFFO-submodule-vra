@@ -1025,10 +1025,12 @@ generic_range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval
 			const unsigned any_value = 0;
 			return fetchConstant(agg_zero_i->getElementValue(any_value));
 		}
-		// fallthrough
+		emitError("Found aggrated zeros which is neither struct neither array neither vector");
+		return nullptr;
 	}
 	const llvm::ConstantData* data = dyn_cast<llvm::ConstantData>(kval);
 	if (data) {
+		// FIXME should never happen -- all subcases handled before
 		emitError("Extract value from llvm::ConstantData not implemented yet");
 		return nullptr;
 	}
@@ -1040,7 +1042,14 @@ generic_range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval
 	const llvm::ConstantAggregate* aggr_i = dyn_cast<llvm::ConstantAggregate>(kval);
 	if (aggr_i) {
 		// TODO implement
-		emitError("Constant aggregates not supported yet");
+		if (dyn_cast<llvm::ConstantStruct>(aggr_i)) {
+			emitError("Constant structs not supported yet");
+			return nullptr;
+		} else {
+			// ConstantArray or ConstantVector
+			const unsigned any_value = 0;
+			return fetchConstant(aggr_i->getOperand(any_value));
+		}
 		return nullptr;
 	}
 	const llvm::BlockAddress* block_i = dyn_cast<llvm::BlockAddress>(kval);
