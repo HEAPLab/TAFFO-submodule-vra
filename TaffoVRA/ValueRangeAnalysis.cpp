@@ -1028,6 +1028,17 @@ generic_range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval
 		emitError("Found aggrated zeros which is neither struct neither array neither vector");
 		return nullptr;
 	}
+	const llvm::ConstantDataSequential* seq = dyn_cast<llvm::ConstantDataSequential>(kval);
+	if (seq) {
+		const unsigned num_elements = agg_zero_i->getNumElements();
+		const unsigned any_value = 0;
+		generic_range_ptr_t seq_range = fetchConstant(seq->getElementAsConstant(any_value));
+		for (unsigned i = 1; i < num_elements; i++) {
+			generic_range_ptr_t other_range = fetchConstant(seq->getElementAsConstant(i));
+			seq_range = getUnionRange(seq_range, other_range);
+		}
+		return seq_range;
+	}
 	const llvm::ConstantData* data = dyn_cast<llvm::ConstantData>(kval);
 	if (data) {
 		// FIXME should never happen -- all subcases handled before
