@@ -167,7 +167,7 @@ void ValueRangeAnalysis::processModule(Module &M)
 		emitError("No visitable functions found");
 		return;
 	}
-  
+
 	// fetch initial function
 	llvm::Function* current_f = *f_unvisited_set.begin();
 
@@ -968,7 +968,7 @@ const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v)
 	}
 	const llvm::Constant* const_i = dyn_cast_or_null<llvm::Constant>(v);
 	if (const_i) {
-		const range_ptr_t k = fetchConstant(const_i);
+		const generic_range_ptr_t k = fetchConstant(const_i);
 		saveValueInfo(v, k);
 		return k;
 	}
@@ -979,7 +979,7 @@ const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v)
 //-----------------------------------------------------------------------------
 // HELPER TO EXTRACT VALUE FROM A CONSTANT
 //-----------------------------------------------------------------------------
-range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval)
+generic_range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval)
 {
 	const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(kval);
 	if (int_i) {
@@ -993,6 +993,39 @@ range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval)
 		tmp.convert(APFloatBase::IEEEdouble(), APFloat::roundingMode::rmNearestTiesToEven, &losesInfo);
 		const num_t k = static_cast<num_t>(tmp.convertToDouble());
 		return make_range(k, k);
+	}
+	const llvm::ConstantTokenNone* none_i = dyn_cast<llvm::ConstantTokenNone>(kval);
+	if (none_i) {
+		emitError("Warning: treating llvm::ConstantTokenNone as 0");
+		return make_range(0, 0);
+	}
+	const llvm::ConstantPointerNull* null_i = dyn_cast<llvm::ConstantPointerNull>(kval);
+	if (null_i) {
+		emitError("Warning: treating llvm::ConstantPointerNull as 0");
+		return make_range(0, 0);
+	}
+	const llvm::UndefValue* undef_i = dyn_cast<llvm::UndefValue>(kval);
+	if (undef_i) {
+		emitError("Warning: treating llvm::UndefValue as nullptr");
+		return nullptr;
+	}
+	const llvm::ConstantAggregateZero* agg_zero_i = dyn_cast<llvm::ConstantAggregateZero>(kval);
+	if (agg_zero_i) {
+		llvm::Type* zero_type = agg_zero_i->getType();
+		if (dyn_cast<llvm::StructType>(zero_type)) {
+			std::vector<generic_range_ptr_t> s_range;
+			const unsigned num_elements = agg_zero_i->getNumElements();
+			s_range.reserve(num_elements);
+			for (unsigned i = 0; i < num_elements; i++) {
+				s_range.push_back(fetchConstant(agg_zero_i->getElementValue(i)));
+			}
+			return make_s_range(s_range);
+		} else if (dyn_cast<llvm::SequentialType>(zero_type)) {
+			// arrayType or VectorType
+			const unsigned any_value = 0;
+			return fetchConstant(agg_zero_i->getElementValue(any_value));
+		}
+		// fallthrough
 	}
 	const llvm::ConstantData* data = dyn_cast<llvm::ConstantData>(kval);
 	if (data) {
