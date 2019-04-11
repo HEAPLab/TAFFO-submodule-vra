@@ -1030,7 +1030,7 @@ generic_range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval
 	}
 	const llvm::ConstantDataSequential* seq = dyn_cast<llvm::ConstantDataSequential>(kval);
 	if (seq) {
-		const unsigned num_elements = agg_zero_i->getNumElements();
+		const unsigned num_elements = seq->getNumElements();
 		const unsigned any_value = 0;
 		generic_range_ptr_t seq_range = fetchConstant(seq->getElementAsConstant(any_value));
 		for (unsigned i = 1; i < num_elements; i++) {
