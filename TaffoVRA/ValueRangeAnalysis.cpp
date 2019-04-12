@@ -627,7 +627,9 @@ void ValueRangeAnalysis::handleReturn(const llvm::Instruction* ret)
 	const llvm::Function* ret_fun = ret_i->getFunction();
 	generic_range_ptr_t range = fetchInfo(ret_val);
 	generic_range_ptr_t partial = find_ret_val(ret_fun);
-	return_values[ret_fun] = getUnionRange(partial, range);
+	generic_range_ptr_t returned = getUnionRange(partial, range);
+	return_values[ret_fun] = returned;
+	saveValueInfo(ret, returned);
 	logRangeln(return_values[ret_fun]);
 	return;
 }
