@@ -768,6 +768,9 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 
 	if (value_param->getType()->isPointerTy()) {
 		logInfoln("pointer store");
+		if (isa<llvm::ConstantPointerNull>(value_param))
+			return;
+
 		if (isDescendant(address_param, value_param))
 			logError("pointer circularity!");
 		else
