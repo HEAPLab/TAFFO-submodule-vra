@@ -1,4 +1,4 @@
-add_llvm_loadable_module(TaffoVRA
+add_llvm_library(TaffoVRA MODULE
   RangeOperationsCallWhitelist.cpp
   RangeOperationsCallWhitelist.hpp
   RangeOperations.cpp
