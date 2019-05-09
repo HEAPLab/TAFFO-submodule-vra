@@ -108,13 +108,34 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		// retrieve info about instructions, for each basic block bb
 		for (const auto &bb : f.getBasicBlockList()) {
 			for (const auto &i : bb.getInstList()) {
-				// fetch info about Instruction i, if any
-				InputInfo *II = MDManager.retrieveInputInfo(i);
-				if (II != nullptr && isValidRange(II->IRange.get())) {
-					const llvm::Value* i_ptr = &i;
-					user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
+				// fetch info about Instruction i
+				MDInfo *MDI = MDManager.retrieveMDInfo(&i);
+				if (!MDI)
+					continue;
+				// only retain info of instruction i if its weight is lesser than
+				// the weight of all of its parents
+				int weight = MDManager.retrieveInputInfoInitWeightMetadata(&i);
+				bool root = true;
+				if (weight > 0) {
+					for (auto& v: i.operands()) {
+						int parentWeight = MDManager.retrieveInputInfoInitWeightMetadata(v.get());
+						// note: parents without info return -1 weights; thus they do not interfere
+						// with the weight evaluation
+						if (parentWeight < weight) {
+							root = false;
+							break;
+						}
+					}
 				}
-				else if (StructInfo *SI = MDManager.retrieveStructInfo(i)) {
+				if (!root)
+					continue;
+				LLVM_DEBUG(dbgs() << "[harvestMetadata] Considering input metadata of instruction " << i << " (weight=" << weight << ")\n");
+				if (InputInfo *II = dyn_cast<InputInfo>(MDI)) {
+					if (isValidRange(II->IRange.get())) {
+						const llvm::Value* i_ptr = &i;
+						user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
+					}
+				} else if (StructInfo *SI = dyn_cast<StructInfo>(MDI)) {
 					const llvm::Value* i_ptr = &i;
 					user_input[i_ptr] = harvestStructMD(SI);
 				}
