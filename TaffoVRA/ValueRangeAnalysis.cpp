@@ -127,6 +127,10 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 				int weight = MDManager.retrieveInputInfoInitWeightMetadata(&i);
 				bool root = true;
 				if (weight > 0) {
+					if (isa<AllocaInst>(i)) {
+						// Kludge for alloca not to be always roots, please check
+						root = false;
+					}
 					for (auto& v: i.operands()) {
 						int parentWeight = MDManager.retrieveInputInfoInitWeightMetadata(v.get());
 						// note: parents without info return -1 weights; thus they do not interfere
