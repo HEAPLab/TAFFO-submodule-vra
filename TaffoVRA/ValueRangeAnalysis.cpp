@@ -96,12 +96,22 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		}
 
 		// retrieve info about function parameters
-		SmallVector<mdutils::MDInfo*, 5> argsII;
+		SmallVector<mdutils::MDInfo*, 5U> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
+		SmallVector<int, 5U> argsW;
+		MetadataManager::retrieveInputInfoInitWeightMetadata(&f, argsW);
 		if (!argsII.empty()) {
 			fun_arg_input[&f] = std::list<generic_range_ptr_t>();
+			auto itW = argsW.begin();
 			for (auto itII = argsII.begin(); itII != argsII.end(); itII++) {
-				fun_arg_input[&f].push_back(harvestStructMD(*itII));
+			  if (itW != argsW.end()) {
+			    if (*itW == 1U) {
+			      fun_arg_input[&f].push_back(harvestStructMD(*itII));
+			    }
+			    ++itW;
+			  } else {
+			    fun_arg_input[&f].push_back(harvestStructMD(*itII));
+			  }
 			}
 		}
 
