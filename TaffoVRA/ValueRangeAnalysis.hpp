@@ -117,6 +117,7 @@ protected:
 	static void emitError(const std::string& message);
 	static std::string to_string(const generic_range_ptr_t& range);
         static void logInstruction(const llvm::Value* v);
+	void logRangeln(const llvm::Value* v);
         static void logRangeln(const generic_range_ptr_t& range);
         static void logInfo(const llvm::StringRef info);
 	static void logInfoln(const llvm::StringRef info);

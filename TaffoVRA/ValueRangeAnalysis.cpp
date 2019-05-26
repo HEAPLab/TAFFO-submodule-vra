@@ -358,7 +358,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			saveValueInfo(&i, res);
 
 			LLVM_DEBUG(if (!info) logInfo("operand range is null"));
-			logRangeln(res);
+			logRangeln(&i);
 		}
 		else if (Instruction::isBinaryOp(opCode))
 		{
@@ -376,7 +376,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 
 			LLVM_DEBUG(if (!info1) logInfo("first range is null"));
 			LLVM_DEBUG(if (!info2) logInfo("second range is null"));
-			logRangeln(res);
+			logRangeln(&i);
 		}
 #if LLVM_VERSION > 7
 		else if (Instruction::isUnaryOp(opCode))
@@ -389,7 +389,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			saveValueInfo(&i, res);
 
 			LLVM_DEBUG(if (!info1) logInfo("operand range is null"));
-			logRangeln(res);
+			logRangeln(&i);
 		}
 #endif
 		else {
@@ -402,6 +402,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 				case llvm::Instruction::Load:
 					tmp = handleLoadInstr(&i);
 					saveValueInfo(&i, tmp);
+					logRangeln(&i);
 					break;
 				case llvm::Instruction::Store:
 					handleStoreInstr(&i);
@@ -575,7 +576,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	if (res) {
 		saveValueInfo(call, res);
 		logInfo("whitelisted");
-		logRangeln(res);
+		logRangeln(call);
 		return;
 	}
 
@@ -628,7 +629,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		}
 	}
 	saveValueInfo(call, res);
-	logRangeln(res);
+	logRangeln(call);
 	return;
 }
 
@@ -649,7 +650,7 @@ void ValueRangeAnalysis::handleMemCpyIntrinsics(const llvm::Instruction* memcpy)
 
 	const generic_range_ptr_t src_range = fetchInfo(src);
 	saveValueInfo(dest, src_range);
-	logRangeln(src_range);
+	logRangeln(dest);
 }
 
 //-----------------------------------------------------------------------------
@@ -670,7 +671,7 @@ void ValueRangeAnalysis::handleReturn(const llvm::Instruction* ret)
 	generic_range_ptr_t returned = getUnionRange(partial, range);
 	return_values[ret_fun] = returned;
 	saveValueInfo(ret, returned);
-	logRangeln(return_values[ret_fun]);
+	logRangeln(ret);
 	return;
 }
 
@@ -822,7 +823,7 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 	const generic_range_ptr_t range = fetchInfo(value_param);
 	saveValueInfo(address_param, range);
 	saveValueInfo(store_i, range);
-	logRangeln(range);
+	logRangeln(store_i);
 	return;
 }
 
@@ -854,7 +855,6 @@ generic_range_ptr_t ValueRangeAnalysis::handleLoadInstr(llvm::Instruction* load)
 	for (Value *dval : def_vals) {
 	    res = getUnionRange(res, fetchInfo(dval));
 	}
-	logRangeln(res);
 	return res;
 }
 
@@ -1344,6 +1344,12 @@ std::string ValueRangeAnalysis::to_string(const generic_range_ptr_t& range)
 	} else {
 		return "null range!";
 	}
+}
+
+void ValueRangeAnalysis::logRangeln(const llvm::Value* v)
+{
+	LLVM_DEBUG(if (user_input.count(v)) dbgs() << "(from metadata) ");
+	logRangeln(fetchInfo(v));
 }
 
 void ValueRangeAnalysis::logRangeln(const generic_range_ptr_t& range)
