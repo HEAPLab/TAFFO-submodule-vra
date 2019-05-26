@@ -132,7 +132,12 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 						root = false;
 					}
 					for (auto& v: i.operands()) {
-						int parentWeight = MDManager.retrieveInputInfoInitWeightMetadata(v.get());
+						int parentWeight = -1;
+						if (Argument* a = dyn_cast<Argument>(v.get())) {
+						  parentWeight = argsW[a->getArgNo()];
+						} else {
+						  parentWeight = MDManager.retrieveInputInfoInitWeightMetadata(v.get());
+						}
 						// note: parents without info return -1 weights; thus they do not interfere
 						// with the weight evaluation
 						if (parentWeight < weight) {
