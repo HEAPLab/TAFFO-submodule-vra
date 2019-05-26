@@ -273,6 +273,12 @@ range_ptr_t taffo::handleMul(const range_ptr_t &op1, const range_ptr_t &op2)
 	if (!op1 || !op2) {
 		return nullptr;
 	}
+	if (op1 == op2) {
+		// This is a square.
+		num_t a = op1->min() * op1->min();
+		num_t b = op1->max() * op1->max();
+		return make_range(std::min(a, b), std::max(a, b));
+	}
 	num_t a = op1->min() * op2->min();
 	num_t b = op1->max() * op2->max();
 	num_t c = op1->min() * op2->max();
