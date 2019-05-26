@@ -277,7 +277,9 @@ range_ptr_t taffo::handleMul(const range_ptr_t &op1, const range_ptr_t &op2)
 		// This is a square.
 		num_t a = op1->min() * op1->min();
 		num_t b = op1->max() * op1->max();
-		return make_range(std::min(a, b), std::max(a, b));
+		num_t r1 = (op1->min() <= 0.0 && op1->max() >= 0) ? 0.0 : std::min(a, b);
+		num_t r2 = std::max(a, b);
+		return make_range(r1, r2);
 	}
 	num_t a = op1->min() * op2->min();
 	num_t b = op1->max() * op2->max();
