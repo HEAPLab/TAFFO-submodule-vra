@@ -782,9 +782,14 @@ void ValueRangeAnalysis::updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
 		std::shared_ptr<StructInfo> si = std::static_ptr_cast<StructInfo>(mdi);
 		auto derfield_it = structr->ranges().begin();
 		auto derfield_end = structr->ranges().end();
-		for (std::shared_ptr<mdutils::MDInfo> mdfield : *si) {
+		for (StructInfo::size_type i = 0; i < si->size(); ++i) {
 			if (derfield_it == derfield_end) break;
-			updateMDInfo(mdfield, *derfield_it);
+			std::shared_ptr<mdutils::MDInfo> mdfield = si->getField(i);
+			if (mdfield)
+			  updateMDInfo(mdfield, *derfield_it);
+			else
+			  si->setField(i, toMDInfo(*derfield_it));
+
 			++derfield_it;
 		}
 		return;
