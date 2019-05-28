@@ -399,7 +399,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 			switch (opCode) {
 				// memory operations
 				case llvm::Instruction::Alloca:
-					derived_ranges[&i] = make_range_node();
+					derived_ranges[&i] = make_range_node(fetchInfo(&i));
 					break;
 				case llvm::Instruction::Load:
 					tmp = handleLoadInstr(&i);
