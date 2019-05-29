@@ -298,10 +298,10 @@ range_ptr_t taffo::handleDiv(const range_ptr_t &op1, const range_ptr_t &op2)
 	}
 	// Avoid division by 0
 	num_t op2_min = (op2->min() == 0.0 && op2->max() > 0.0)
-	  ? std::nextafter(static_cast<num_t>(0.0), static_cast<num_t>(op2->max()))
+	  ? 1.0 // std::nextafter(static_cast<num_t>(0.0), static_cast<num_t>(op2->max()))
 	  : op2->min();
 	num_t op2_max = (op2->max() == 0.0 && op2->min() < 0.0)
-	  ? std::nextafter(static_cast<num_t>(0.0), static_cast<num_t>(op2->min()))
+	  ? -1.0 // std::nextafter(static_cast<num_t>(0.0), static_cast<num_t>(op2->min()))
 	  : op2->max();
 	num_t a = op1->min() / op2_min;
 	num_t b = op1->max() / op2_max;
