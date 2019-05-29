@@ -89,7 +89,7 @@ private:
 	inline unsigned find_recursion_count(const llvm::Function* f);
 
 protected:
-	const generic_range_ptr_t fetchInfo(const llvm::Value* v);
+	const generic_range_ptr_t fetchInfo(const llvm::Value* v, bool derived_only = false);
 
 	void saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info);
 

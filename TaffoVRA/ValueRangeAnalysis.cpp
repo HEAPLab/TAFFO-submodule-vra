@@ -684,7 +684,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 {
 	MetadataManager &MDManager = MetadataManager::getMetadataManager();
 	for (GlobalVariable &v : M.globals()) {
-		const generic_range_ptr_t range = fetchInfo(&v);
+		const generic_range_ptr_t range = fetchInfo(&v, true);
 		if (range != nullptr) {
 			// retrieve info about global var v, if any
 			if (MDInfo *mdi = MDManager.retrieveMDInfo(&v)) {
@@ -709,7 +709,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 			newII.reserve(f.arg_size());
 			auto argsIt = argsII.begin();
 			for (Argument &arg : f.args()) {
-				const generic_range_ptr_t range = fetchInfo(&arg);
+				const generic_range_ptr_t range = fetchInfo(&arg, true);
 				if (range != nullptr) {
 					if (argsIt != argsII.end() && *argsIt != nullptr) {
 						std::shared_ptr<MDInfo> cpymdi((*argsIt)->clone());
@@ -733,7 +733,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 				if (isa<StoreInst>(i))
 					continue;
 				refreshRange(&i);
-				const generic_range_ptr_t range = fetchInfo(&i);
+				const generic_range_ptr_t range = fetchInfo(&i, true);
 				if (range != nullptr) {
 					MDInfo *mdi = MDManager.retrieveMDInfo(&i);
 					if (mdi != nullptr) {
@@ -997,11 +997,12 @@ unsigned ValueRangeAnalysis::find_recursion_count(const llvm::Function* f)
 //-----------------------------------------------------------------------------
 // RETRIEVE INFO
 //-----------------------------------------------------------------------------
-const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v)
+const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v,
+							bool derived_only)
 {
 	generic_range_ptr_t input_range = nullptr;
 	auto input_it = user_input.find(v);
-	if (input_it != user_input.end()) {
+	if (!derived_only && input_it != user_input.end()) {
 		input_range = input_it->second;
 		if (std::dynamic_ptr_cast_or_null<range_t>(input_range))
 			return input_range;
