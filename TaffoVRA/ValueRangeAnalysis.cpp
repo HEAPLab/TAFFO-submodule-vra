@@ -702,26 +702,30 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		// arg range
 		SmallVector<MDInfo*, 5U> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
-		SmallVector<std::shared_ptr<MDInfo>, 5U> newII;
-		newII.reserve(f.arg_size());
-		auto argsIt = argsII.begin();
-		for (Argument &arg : f.args()) {
-			const generic_range_ptr_t range = fetchInfo(&arg);
-			if (range != nullptr) {
-				if (argsIt != argsII.end() && *argsIt != nullptr) {
-					std::shared_ptr<MDInfo> cpymdi((*argsIt)->clone());
-					updateMDInfo(cpymdi, range);
-					newII.push_back(cpymdi);
-					*argsIt = cpymdi.get();
-				} else {
-					std::shared_ptr<MDInfo> newmdi = toMDInfo(range);
-					newII.push_back(newmdi);
-					*argsIt = newmdi.get();
+		if (argsII.size() == f.getNumOperands()) {
+			/* argsII.size() != f.getNumOperands() when there was no metadata
+			 * on the arguments in the first place */
+			SmallVector<std::shared_ptr<MDInfo>, 5U> newII;
+			newII.reserve(f.arg_size());
+			auto argsIt = argsII.begin();
+			for (Argument &arg : f.args()) {
+				const generic_range_ptr_t range = fetchInfo(&arg);
+				if (range != nullptr) {
+					if (argsIt != argsII.end() && *argsIt != nullptr) {
+						std::shared_ptr<MDInfo> cpymdi((*argsIt)->clone());
+						updateMDInfo(cpymdi, range);
+						newII.push_back(cpymdi);
+						*argsIt = cpymdi.get();
+					} else {
+						std::shared_ptr<MDInfo> newmdi = toMDInfo(range);
+						newII.push_back(newmdi);
+						*argsIt = newmdi.get();
+					}
 				}
+				++argsIt;
 			}
-			++argsIt;
+			MDManager.setArgumentInputInfoMetadata(f, argsII);
 		}
-		MDManager.setArgumentInputInfoMetadata(f, argsII);
 
 		// retrieve info about instructions, for each basic block bb
 		for (BasicBlock &bb : f.getBasicBlockList()) {
