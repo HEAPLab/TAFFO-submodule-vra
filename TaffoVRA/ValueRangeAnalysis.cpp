@@ -1097,8 +1097,13 @@ generic_range_ptr_t ValueRangeAnalysis::fetchConstant(const llvm::Constant* kval
 		emitError("Extract value from llvm::ConstantData not implemented yet");
 		return nullptr;
 	}
-	const llvm::ConstantExpr* cexp_i = dyn_cast<llvm::ConstantExpr>(kval);
-	if (cexp_i) {
+	if (const llvm::ConstantExpr* cexp_i = dyn_cast<llvm::ConstantExpr>(kval)) {
+		if (cexp_i->isGEPWithNoNotionalOverIndexing()) {
+			if (getOrCreateNode(cexp_i))
+				return fetchInfo(cexp_i);
+			else
+				return nullptr;
+		}
 		emitError("Could not fold a llvm::ConstantExpr");
 		return nullptr;
 	}

@@ -108,7 +108,7 @@ protected:
 			      std::vector<unsigned>& offset);
 
 
-	static inline generic_range_ptr_t fetchConstant(const llvm::Constant* v);
+	generic_range_ptr_t fetchConstant(const llvm::Constant* v);
 
 	static std::shared_ptr<mdutils::MDInfo> toMDInfo(const generic_range_ptr_t &r);
 	static void updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
