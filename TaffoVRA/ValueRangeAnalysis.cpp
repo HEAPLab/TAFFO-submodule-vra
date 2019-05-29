@@ -702,7 +702,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		// arg range
 		SmallVector<MDInfo*, 5U> argsII;
 		MDManager.retrieveArgumentInputInfo(f, argsII);
-		if (argsII.size() == f.getNumOperands()) {
+		if (argsII.size() == f.getFunctionType()->getNumParams()) {
 			/* argsII.size() != f.getNumOperands() when there was no metadata
 			 * on the arguments in the first place */
 			SmallVector<std::shared_ptr<MDInfo>, 5U> newII;
