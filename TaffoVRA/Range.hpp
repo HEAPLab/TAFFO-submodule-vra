@@ -64,6 +64,7 @@ public:
 	VRA_Generic_Range(const VRA_Generic_Range&) = delete;
 	virtual ~VRA_Generic_Range() {};
 	virtual generic_range_ptr_t clone() const = 0;
+	virtual inline bool isFinal() const = 0;
 };
 
 
@@ -74,25 +75,29 @@ template<
 struct VRA_Range : VRA_Generic_Range
 {
 public:
-	VRA_Range(const num_t min, const num_t max)
+	VRA_Range(const num_t min, const num_t max, bool is_final = false)
 		: VRA_Generic_Range(kind_scalar),
 		_min(min),
-		_max(max)
+		_max(max),
+		_is_final(is_final)
 		{}
 	VRA_Range()
 		: VRA_Generic_Range(kind_scalar),
 		_min(std::numeric_limits<num_t>::lowest()),
-		_max(std::numeric_limits<num_t>::max())
+		_max(std::numeric_limits<num_t>::max()),
+		_is_final(false)
 		{}
 	VRA_Range(const VRA_Range& rhs)
 		: VRA_Generic_Range(kind_scalar),
 		_min(rhs.min()),
-		_max(rhs.max())
+		_max(rhs.max()),
+		_is_final(rhs._is_final)
 		{}
 	virtual ~VRA_Range(){}
 
 private:
 	num_t _min, _max;
+	bool _is_final;
 
 public:
 	inline const num_t min() const {return _min;}
@@ -101,6 +106,8 @@ public:
 	inline const bool cross(const num_t val = 0.0) const {
 		return min() <= val && max() >= val;
 	}
+	inline bool isFinal() const override { return _is_final; }
+	inline void setFinal(bool is_final) { _is_final = is_final; }
 
 	generic_range_ptr_t clone() const override {
 		return std::make_shared<VRA_Range>(*this);
@@ -183,6 +190,8 @@ public:
 	generic_range_ptr_t clone() const override {
 		return std::make_shared<VRA_Structured_Range>(*this);
 	}
+
+	inline bool isFinal() const override { return false; }
 
 	// LLVM-style RTTI stuff
 public:

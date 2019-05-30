@@ -59,7 +59,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 		// retrieve info about global var v, if any
 		InputInfo *II = MDManager.retrieveInputInfo(v);
 		if (II != nullptr && isValidRange(II->IRange.get())) {
-			user_input[&v] = make_range(II->IRange->Min, II->IRange->Max);
+			user_input[&v] = make_range(II->IRange->Min, II->IRange->Max, II->isFinal());
 			derived_ranges[&v] = make_range_node(user_input[&v]);
 		} else if (StructInfo *SI = MDManager.retrieveStructInfo(v)) {
 			user_input[&v] = harvestStructMD(SI);
@@ -154,7 +154,8 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 				if (InputInfo *II = dyn_cast<InputInfo>(MDI)) {
 					if (isValidRange(II->IRange.get())) {
 						const llvm::Value* i_ptr = &i;
-						user_input[i_ptr] = make_range(II->IRange->Min, II->IRange->Max);
+						user_input[i_ptr] =
+						  make_range(II->IRange->Min, II->IRange->Max, II->isFinal());
 					}
 				} else if (StructInfo *SI = dyn_cast<StructInfo>(MDI)) {
 					const llvm::Value* i_ptr = &i;
@@ -173,7 +174,7 @@ generic_range_ptr_t ValueRangeAnalysis::harvestStructMD(MDInfo *MD) {
 
 	} else if (InputInfo *II = dyn_cast<InputInfo>(MD)) {
 		if (isValidRange(II->IRange.get()))
-			return make_range(II->IRange->Min, II->IRange->Max);
+			return make_range(II->IRange->Min, II->IRange->Max, II->isFinal());
 		else
 			return nullptr;
 
@@ -1182,6 +1183,9 @@ void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const generic_range
 		// set
 		std::list<std::vector<unsigned>> offset;
 		const generic_range_ptr_t old = fetchRange(node, offset);
+		if (old && old->isFinal())
+			return;
+
 		const generic_range_ptr_t updated = getUnionRange(old, info);
 
 		offset.clear();
