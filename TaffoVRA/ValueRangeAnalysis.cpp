@@ -1005,7 +1005,7 @@ const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v,
 	auto input_it = user_input.find(v);
 	if (!derived_only && input_it != user_input.end()) {
 		input_range = input_it->second;
-		if (std::dynamic_ptr_cast_or_null<range_t>(input_range))
+		if (input_range)
 			return input_range;
 	}
 
