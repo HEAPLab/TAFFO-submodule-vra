@@ -140,8 +140,10 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 						} else {
 							continue;
 						}
-						// note: parents without info return -1 weights; thus they do not interfere
-						// with the weight evaluation
+						// only consider parameters with the same metadata
+						MDInfo *MDIV = MDManager.retrieveMDInfo(v.get());
+						if (MDIV != MDI)
+							continue;
 						if (parentWeight < weight) {
 							root = false;
 							break;
