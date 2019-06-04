@@ -1001,19 +1001,19 @@ unsigned ValueRangeAnalysis::find_recursion_count(const llvm::Function* f)
 // RETRIEVE INFO
 //-----------------------------------------------------------------------------
 const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v,
-							bool derived_only)
+							bool derived_or_final)
 {
 	generic_range_ptr_t input_range = nullptr;
 	auto input_it = user_input.find(v);
-	if (!derived_only && input_it != user_input.end()) {
+	if (input_it != user_input.end()) {
 		input_range = input_it->second;
-		if (input_range)
+		if (input_range && (!derived_or_final || input_range->isFinal()))
 			return input_range;
 	}
 
 	if (const auto node = getNode(v)) {
 		if (node->isScalar()) {
-			assert(input_range == nullptr
+			assert((input_range == nullptr || std::isa_ptr<range_t>(input_range))
 			       && "Computed range is scalar, but input range is not.");
 			return node->getRange();
 		} else if (v->getType()->isPointerTy()) {
