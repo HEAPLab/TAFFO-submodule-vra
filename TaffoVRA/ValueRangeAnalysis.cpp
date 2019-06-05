@@ -830,9 +830,12 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 
 		if (isDescendant(address_param, value_param))
 			logError("pointer circularity!");
-		else
+		else {
+			const generic_range_ptr_t old_range = fetchInfo(address_param);
 			derived_ranges[address_param] =
 			  make_range_node(value_param, std::vector<unsigned>());
+			saveValueInfo(address_param, old_range);
+		}
 		return;
 	}
 
@@ -1042,7 +1045,7 @@ const generic_range_ptr_t ValueRangeAnalysis::fetchInfo(const llvm::Value* v,
 				return derived_range;
 			else
 				// fill null input_range fields with corresponding derived fields
-				return fillRangeHoles(input_range, derived_range);
+				return fillRangeHoles(derived_range, input_range);
 		}
 	}
 	const llvm::Constant* const_i = dyn_cast_or_null<llvm::Constant>(v);
