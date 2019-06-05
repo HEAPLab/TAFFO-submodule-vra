@@ -435,8 +435,9 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 					tmp = handlePhiNode(&i);
 					saveValueInfo(&i, tmp);
 					break;
-				case llvm::Instruction::Select: // TODO implement
-					emitError("Handling of Select not supported yet");
+				case llvm::Instruction::Select:
+					tmp = handleSelect(&i);
+					saveValueInfo(&i, tmp);
 					break;
 				case llvm::Instruction::UserOp1: // TODO implement
 				case llvm::Instruction::UserOp2: // TODO implement
@@ -943,6 +944,20 @@ generic_range_ptr_t ValueRangeAnalysis::handlePhiNode(const llvm::Instruction* p
 		generic_range_ptr_t op_range = fetchInfo(op);
 		res = getUnionRange(res, op_range);
 	}
+	logRangeln(res);
+	return res;
+}
+
+//-----------------------------------------------------------------------------
+// HANDLE SELECT
+//-----------------------------------------------------------------------------
+generic_range_ptr_t ValueRangeAnalysis::handleSelect(const llvm::Instruction* i)
+{
+	const llvm::SelectInst* sel = cast<llvm::SelectInst>(i);
+	logInstruction(sel);
+	// TODO: actually handle comparison.
+	generic_range_ptr_t res = getUnionRange(fetchInfo(sel->getFalseValue()),
+						fetchInfo(sel->getTrueValue()));
 	logRangeln(res);
 	return res;
 }

@@ -83,6 +83,7 @@ private:
 	inline range_ptr_t handleCmpInstr(const llvm::Instruction* cmp);
 
 	inline generic_range_ptr_t handlePhiNode(const llvm::Instruction* phi);
+	inline generic_range_ptr_t handleSelect(const llvm::Instruction* i);
 
 	inline generic_range_ptr_t find_ret_val(const llvm::Function* f);
 
