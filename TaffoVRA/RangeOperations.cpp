@@ -532,9 +532,23 @@ range_ptr_t taffo::getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2)
 generic_range_ptr_t taffo::getUnionRange(const generic_range_ptr_t &op1,
 					 const generic_range_ptr_t &op2)
 {
-	range_ptr_t sop1 = std::dynamic_ptr_cast_or_null<range_t>(op1);
-	range_ptr_t sop2 = std::dynamic_ptr_cast_or_null<range_t>(op2);
-	return getUnionRange(sop1, sop2);
+	if (!op1) return copyRange(op2);
+	if (!op2) return copyRange(op1);
+
+	if (const range_ptr_t sop1 = std::dynamic_ptr_cast_or_null<range_t>(op1)) {
+		const range_ptr_t sop2 = std::dynamic_ptr_cast_or_null<range_t>(op2);
+		return getUnionRange(sop1, sop2);
+	}
+
+	const range_s_ptr_t op1_s = std::static_ptr_cast<range_s_t>(op1);
+	const range_s_ptr_t op2_s = std::static_ptr_cast<range_s_t>(op2);
+	unsigned num_fields = std::max(op1_s->getNumRanges(), op2_s->getNumRanges());
+	std::vector<generic_range_ptr_t> new_fields;
+	new_fields.reserve(num_fields);
+	for (unsigned i = 0; i < num_fields; ++i) {
+		new_fields.push_back(getUnionRange(op1_s->getRangeAt(i), op2_s->getRangeAt(i)));
+	}
+	return make_s_range(new_fields);
 }
 
 generic_range_ptr_t taffo::fillRangeHoles(const generic_range_ptr_t &src,

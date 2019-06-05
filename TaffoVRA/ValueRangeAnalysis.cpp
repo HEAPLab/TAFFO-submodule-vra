@@ -1,5 +1,6 @@
 #include "ValueRangeAnalysis.hpp"
 #include "InputInfo.h"
+#include "TypeUtils.h"
 #include "RangeOperations.hpp"
 #include "Metadata.h"
 #include "MemSSAUtils.hpp"
@@ -656,7 +657,7 @@ void ValueRangeAnalysis::handleMemCpyIntrinsics(const llvm::Instruction* memcpy)
 
 	const generic_range_ptr_t src_range = fetchInfo(src);
 	saveValueInfo(dest, src_range);
-	logRangeln(dest);
+	logRangeln(src_range);
 }
 
 //-----------------------------------------------------------------------------
@@ -866,9 +867,12 @@ generic_range_ptr_t ValueRangeAnalysis::handleLoadInstr(llvm::Instruction* load)
 	SmallVectorImpl<Value*>& def_vals = memssa_utils.getDefiningValues(load_i);
 	def_vals.push_back(load_i->getPointerOperand());
 
+	Type *load_ty = fullyUnwrapPointerOrArrayType(load->getType());
 	generic_range_ptr_t res = nullptr;
 	for (Value *dval : def_vals) {
-	    res = getUnionRange(res, fetchInfo(dval));
+		if (dval &&
+		    load_ty->canLosslesslyBitCastTo(fullyUnwrapPointerOrArrayType(dval->getType())))
+			res = getUnionRange(res, fetchInfo(dval));
 	}
 	return res;
 }
