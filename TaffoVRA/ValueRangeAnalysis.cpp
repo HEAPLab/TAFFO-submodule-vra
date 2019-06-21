@@ -1358,7 +1358,7 @@ bool ValueRangeAnalysis::isDescendant(const llvm::Value* parent,
 //-----------------------------------------------------------------------------
 void ValueRangeAnalysis::emitError(const std::string& message)
 {
-	llvm::dbgs() << "[TAFFO] Value Range Analysis: " << message << "\n";
+	LLVM_DEBUG(dbgs() << "[TAFFO] Value Range Analysis: " << message << "\n");
 	return;
 }
 
