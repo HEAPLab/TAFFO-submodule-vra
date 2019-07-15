@@ -2,7 +2,6 @@
 #include "InputInfo.h"
 #include "TypeUtils.h"
 #include "RangeOperations.hpp"
-#include "Metadata.h"
 #include "MemSSAUtils.hpp"
 #include "TopologicalBBSort.hpp"
 
@@ -735,6 +734,7 @@ void ValueRangeAnalysis::saveResults(llvm::Module &M)
 		// retrieve info about instructions, for each basic block bb
 		for (BasicBlock &bb : f.getBasicBlockList()) {
 			for (Instruction &i : bb.getInstList()) {
+				setConstRangeMetadata(MDManager, i);
 				if (isa<StoreInst>(i))
 					continue;
 				refreshRange(&i);
@@ -808,6 +808,43 @@ void ValueRangeAnalysis::updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
 	llvm_unreachable("Unknown range type.");
 }
 
+void ValueRangeAnalysis::setConstRangeMetadata(MetadataManager &MDManager,
+					       llvm::Instruction &i)
+{
+	unsigned opCode = i.getOpcode();
+	if (!(i.isBinaryOp() || i.isUnaryOp() || opCode == Instruction::Store
+	      || opCode == Instruction::Call || opCode == Instruction::Invoke))
+		return;
+
+	bool hasConstOp = false;
+	for (const Value *op : i.operands()) {
+		if (isa<Constant>(op)) {
+			hasConstOp = true;
+			break;
+		}
+	}
+
+	SmallVector<std::unique_ptr<InputInfo>, 2U> CInfoPtr;
+	SmallVector<InputInfo *, 2U> CInfo;
+	CInfo.reserve(i.getNumOperands());
+	if (hasConstOp) {
+		for (const Value *op : i.operands()) {
+			if (const ConstantFP *c = dyn_cast<ConstantFP>(op)) {
+				APFloat apf = c->getValueAPF();
+				bool discard;
+				apf.convert(APFloat::IEEEdouble(), APFloat::rmNearestTiesToAway, &discard);
+				double value = apf.convertToDouble();
+				CInfoPtr.push_back(std::unique_ptr<InputInfo>(new InputInfo(nullptr,
+											    std::make_shared<Range>(value, value),
+											    nullptr)));
+				CInfo.push_back(CInfoPtr.back().get());
+			} else {
+				CInfo.push_back(nullptr);
+			}
+		}
+		MDManager.setConstInfoMetadata(i, CInfo);
+	}
+}
 
 //-----------------------------------------------------------------------------
 // HANDLE MEMORY OPERATIONS

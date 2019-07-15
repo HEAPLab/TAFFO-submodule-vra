@@ -18,7 +18,7 @@
 #include <unordered_map>
 #include <vector>
 #include <list>
-#include <InputInfo.h>
+#include <Metadata.h>
 
 #define DEBUG_TYPE "taffo-vra"
 #define DEBUG_VRA "ValueRangeAnalysis"
@@ -114,6 +114,8 @@ protected:
 	static std::shared_ptr<mdutils::MDInfo> toMDInfo(const generic_range_ptr_t &r);
 	static void updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
 				 const generic_range_ptr_t &r);
+	static void setConstRangeMetadata(mdutils::MetadataManager &MDManager,
+					  llvm::Instruction &i);
 
 	static void emitError(const std::string& message);
 	static std::string to_string(const generic_range_ptr_t& range);
