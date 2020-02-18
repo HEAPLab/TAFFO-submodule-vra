@@ -6,9 +6,7 @@
 
 namespace taffo {
 
-// TODO: add Loop stuff
 // TODO: add function call stuff
-
 
 class CodeAnalyzer {
 public:
@@ -33,22 +31,30 @@ private:
 
 
 class CodeInterpreter {
-  CodeInterpreter(std::unique_ptr<CodeAnalyzer> GlobalAnalyzer)
-    : GlobalAnalyzer(GlobalAnalyzer), BBAnalyzers() {}
+  CodeInterpreter(llvm::Pass &P, std::unique_ptr<CodeAnalyzer> GlobalAnalyzer)
+    : GlobalAnalyzer(GlobalAnalyzer), BBAnalyzers(), Pass(P), LoopInfo(nullptr) {}
 
   void interpretFunction(llvm::Function *F);
+
+  static void getAnalysisUsage(llvm::AnalysisUsage &AU);
 
 protected:
   std::unique_ptr<CodeAnalyzer> GlobalAnalyzer;
   llvm::DenseMap<llvm::BasicBlock *, std::shared_ptr<CodeAnalyzer> > BBAnalyzers;
-  llvm::SmallPtrSet<llvm::BasicBlock *> Visited;
+  llvm::Pass &Pass;
+  llvm::LoopInfo *LoopInfo;
+  llvm::DenseMap<llvm::BasicBlock *, unsigned> LoopIterCount;
 
 private:
   bool wasVisited(llvm::BasicBlock *BB) const;
   bool hasUnvisitedPredecessors(llvm::BasicBlock *BB) const;
+  bool isLoopBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
+  llvm::Loop *getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
+  bool followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
   void updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAnalyzer,
                                std::shared_ptr<CodeAnalyzer> PathLocal,
                                llvm::Instruction *TermInstr, unsigned SuccIdx);
+  void retrieveLoopIterCount(llvm::Function *F);
 };
 
 } // end namespace taffo
