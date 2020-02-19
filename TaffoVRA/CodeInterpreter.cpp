@@ -2,6 +2,7 @@
 
 #include <deque>
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/IR/InstrTypes.h"
 #include <Metadata.h>
 
 namespace taffo {
@@ -12,7 +13,7 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
 
   std::deque<llvm::BasicBlock *> Worklist;
   Worklist.push_back(&F->getEntryBlock());
-  BBAnalyzers[&F->getEntryBlock()] = GlobalAnalyzer->newCodeAnalyzer();
+  BBAnalyzers[&F->getEntryBlock()] = GlobalAnalyzer->newCodeAnalyzer(this);
 
   while (!Worklist.empty()) {
     llvm::BasicBlock *BB = Worklist.front();
@@ -29,7 +30,10 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
     std::shared_ptr<CodeAnalyzer> PathLocal = CurAnalyzer->clone();
 
     for (llvm::Instruction &I : *BB) {
-      CurAnalyzer->analyzeInstruction(&I);
+      if (CurAnalyzer->requiresInterpretation(&I))
+	interpretCall(CurAnalyzer, &I);
+      else
+	CurAnalyzer->analyzeInstruction(&I);
     }
 
     llvm::Instruction *Term = BB->getTerminator();
@@ -43,6 +47,18 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
 
     CurAnalyzer->setFinal();
   }
+}
+
+std::shared_ptr<CodeAnalyzer> CodeInterpreter::getAnalyzerForValue(const llvm::Value *V) const {
+  if (llvm::isa<llvm::GlobalValue>(V) || llvm::isa<llvm::Argument>(V))
+    return GlobalAnalyzer;
+
+  if (const llvm::Instruction *I = llvm::dyn_cast<llvm::Instruction>(V)) {
+    auto BBAIt = BBAnalyzers.find(I->getParent());
+    if (BBAIt != BBAnalyzers.end())
+      return BBAIt->second;
+  }
+  return nullptr;
 }
 
 bool CodeInterpreter::wasVisited(llvm::BasicBlock *BB) const {
@@ -117,6 +133,25 @@ void CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> Curr
   CurrentAnalyzer->setPathLocalInfo(SuccAnalyzer, TermInstr, SuccIdx);
 }
 
+void CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
+                                    llvm::Instruction *I) {
+  CurAnalyzer->prepareForCall(I, *GlobalAnalyzer);
+
+  llvm::CallBase *CB = llvm::dyn_cast<llvm::CallBase>(I);
+  assert(CB);
+  llvm::Function *F = CB->getCalledFunction();
+  if (!F)
+    return;
+
+  if (updateRecursionCount(F))
+    interpretFunction(F);
+
+  // TODO: Make things so that returns are saved in the global analyzer
+  CurAnalyzer->returnFromCall(I, *GlobalAnalyzer);
+
+  updateLoopInfo(I->getFunction());
+}
+
 void CodeInterpreter::updateLoopInfo(llvm::Function *F) {
   assert(F);
   LoopInfo = &Pass.getAnalysis<llvm::LoopInfoWrapperPass>(*F).getLoopInfo();
@@ -143,6 +178,24 @@ void CodeInterpreter::retrieveLoopIterCount(llvm::Function *F) {
 	LoopIterCount[Latch] = IterCount;
     }
   }
+}
+
+bool CodeInterpreter::updateRecursionCount(llvm::Function *F) {
+  auto RCIt = RecursionCount.find(F);
+  if (RCIt == RecursionCount.end()) {
+    unsigned FromMD = mdutils::MetadataManager::retrieveMaxRecursionCount(*F);
+    if (FromMD > 0)
+      --FromMD;
+
+    RecursionCount[F] = FromMD;
+    return true;
+  }
+  unsigned &Remaining = RCIt->second;
+  if (Remaining > 0) {
+    --Remaining;
+    return true;
+  }
+  return false;
 }
 
 void CodeInterpreter::getAnalysisUsage(llvm::AnalysisUsage &AU) {
