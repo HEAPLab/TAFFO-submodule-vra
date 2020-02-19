@@ -9,6 +9,8 @@ add_llvm_library(TaffoVRA MODULE
   ValueRangeAnalysis.hpp
   MemSSAUtils.cpp
   MemSSAUtils.hpp
+  CodeInterpreter.cpp
+  CodeInterpreter.hpp
 
   PLUGIN_TOOL
   opt

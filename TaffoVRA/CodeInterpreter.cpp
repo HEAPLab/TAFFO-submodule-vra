@@ -1,4 +1,8 @@
-#include "CodeScheduler.hpp"
+#include "CodeInterpreter.hpp"
+
+#include <deque>
+#include "llvm/Analysis/ScalarEvolution.h"
+#include <Metadata.h>
 
 namespace taffo {
 
@@ -19,16 +23,16 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
       continue;
     }
 
-    auto CAIt = BBnalyzers.find(BB);
+    auto CAIt = BBAnalyzers.find(BB);
     assert(CAIt != BBAnalyzers.end());
-    std::shared_ptr<CodeAnalyzer> CurAnalyzer = *CAIt;
+    std::shared_ptr<CodeAnalyzer> CurAnalyzer = CAIt->second;
     std::shared_ptr<CodeAnalyzer> PathLocal = CurAnalyzer->clone();
 
-    for (llvm::Instruction *I : *BB) {
-      CurAnalyzer->analyzeInstruction(I);
+    for (llvm::Instruction &I : *BB) {
+      CurAnalyzer->analyzeInstruction(&I);
     }
 
-    llvm::Instruction Term = BB->getTerminator();
+    llvm::Instruction *Term = BB->getTerminator();
     for (unsigned NS = 0; NS < Term->getNumSuccessors(); ++NS) {
       llvm::BasicBlock *Succ = Term->getSuccessor(NS);
       if (followEdge(BB, Succ)) {
@@ -46,7 +50,7 @@ bool CodeInterpreter::wasVisited(llvm::BasicBlock *BB) const {
   if (BBAIt == BBAnalyzers.end())
     return false;
 
-  return (*BBAIt)->isFinal();
+  return BBAIt->second->isFinal();
 }
 
 bool CodeInterpreter::hasUnvisitedPredecessors(llvm::BasicBlock *BB) const {
@@ -71,7 +75,7 @@ llvm::Loop *CodeInterpreter::getLoopForBackEdge(llvm::BasicBlock *Src, llvm::Bas
   return L;
 }
 
-bool CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const {
+bool CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
   if (!wasVisited(Dst))
     return true;
 
@@ -97,37 +101,42 @@ void CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> Curr
 					      std::shared_ptr<CodeAnalyzer> PathLocal,
                                               llvm::Instruction *TermInstr,
                                               unsigned SuccIdx) {
-  llvm::BasicBlock *SuccBB = TermInstr.getSuccessor(SuccIdx);
+  llvm::BasicBlock *SuccBB = TermInstr->getSuccessor(SuccIdx);
 
   std::shared_ptr<CodeAnalyzer> SuccAnalyzer;
   auto SAIt = BBAnalyzers.find(SuccBB);
   if (SAIt == BBAnalyzers.end()) {
-    SuccAnalyzer = (SuccIdx < TermInstr->getNumSuccessors()) ? PathLocal.clone() : PathLocal;
+    SuccAnalyzer = (SuccIdx < TermInstr->getNumSuccessors()) ? PathLocal->clone() : PathLocal;
     BBAnalyzers[SuccBB] = SuccAnalyzer;
   }
   else {
-    SuccAnalyzer = *SAIt;
-    SuccAnalyzer.convexMerge(PathLocal);
+    SuccAnalyzer = SAIt->second;
+    SuccAnalyzer->convexMerge(*PathLocal);
   }
 
-  CurrentAnalyzer.setPathLocalInfo(SuccAnalyzer, TermInstr, SuccIdx);
+  CurrentAnalyzer->setPathLocalInfo(SuccAnalyzer, TermInstr, SuccIdx);
+}
+
+void CodeInterpreter::updateLoopInfo(llvm::Function *F) {
+  assert(F);
+  LoopInfo = &Pass.getAnalysis<llvm::LoopInfoWrapperPass>(*F).getLoopInfo();
 }
 
 void CodeInterpreter::retrieveLoopIterCount(llvm::Function *F) {
-  assert(LoopInfo);
-  ScalarEvolution *SE = nullptr;
-  for (Loop *L : LoopInfo) {
+  assert(LoopInfo && F);
+  llvm::ScalarEvolution *SE = nullptr;
+  for (llvm::Loop *L : *LoopInfo) {
     if (llvm::BasicBlock *Latch = L->getLoopLatch()) {
       unsigned IterCount = 0;
       // Get user supplied unroll count
-      Optional<unsigned> OUC = mdutils::MetadataManager::retrieveLoopUnrollCount(*L, &LoopInfo);
+      llvm::Optional<unsigned> OUC = mdutils::MetadataManager::retrieveLoopUnrollCount(*L, LoopInfo);
       if (OUC.hasValue()) {
 	IterCount = OUC.getValue();
       }
       else {
 	// Compute loop trip count
 	if (!SE)
-	  SE = &Pass.getAnalysis<ScalarEvolutionWrapperPass>(F).getSE();
+	  SE = &Pass.getAnalysis<llvm::ScalarEvolutionWrapperPass>(*F).getSE();
 	IterCount = SE->getSmallConstantTripCount(L);
       }
       if (IterCount > 0)
@@ -136,9 +145,9 @@ void CodeInterpreter::retrieveLoopIterCount(llvm::Function *F) {
   }
 }
 
-static void CodeInterpreter::getAnalysisUsage(llvm::AnalysisUsage &AU) {
-  AU.addRequiredTransitive<LoopInfoWrapperPass>();
-  AU.addRequiredTransitive<ScalarEvolutionWrapperPass>();
+void CodeInterpreter::getAnalysisUsage(llvm::AnalysisUsage &AU) {
+  AU.addRequiredTransitive<llvm::LoopInfoWrapperPass>();
+  AU.addRequiredTransitive<llvm::ScalarEvolutionWrapperPass>();
 }
 
 

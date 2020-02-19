@@ -2,7 +2,9 @@
 #define TAFFO_CODE_SCHEDULER_HPP
 
 #include <memory>
-#include "TaffoUtils/MultiValueMap.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/Pass.h"
+#include "llvm/Analysis/LoopInfo.h"
 
 namespace taffo {
 
@@ -31,8 +33,8 @@ private:
 
 
 class CodeInterpreter {
-  CodeInterpreter(llvm::Pass &P, std::unique_ptr<CodeAnalyzer> GlobalAnalyzer)
-    : GlobalAnalyzer(GlobalAnalyzer), BBAnalyzers(), Pass(P), LoopInfo(nullptr) {}
+  CodeInterpreter(llvm::Pass &P, std::unique_ptr<CodeAnalyzer> &&GlobalAnalyzer)
+    : GlobalAnalyzer(std::move(GlobalAnalyzer)), BBAnalyzers(), Pass(P), LoopInfo(nullptr) {}
 
   void interpretFunction(llvm::Function *F);
 
@@ -50,10 +52,11 @@ private:
   bool hasUnvisitedPredecessors(llvm::BasicBlock *BB) const;
   bool isLoopBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
   llvm::Loop *getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
-  bool followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
+  bool followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst);
   void updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAnalyzer,
                                std::shared_ptr<CodeAnalyzer> PathLocal,
                                llvm::Instruction *TermInstr, unsigned SuccIdx);
+  void updateLoopInfo(llvm::Function *F);
   void retrieveLoopIterCount(llvm::Function *F);
 };
 
