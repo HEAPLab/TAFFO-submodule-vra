@@ -31,7 +31,7 @@ generic_range_ptr_t handleCastInstruction(const generic_range_ptr_t &op,
 
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
-                                      const std::string &function);
+                                      const llvm::Function *function);
 
 generic_range_ptr_t handleCompare(const std::list<generic_range_ptr_t>& ops,
                                   const llvm::CmpInst::Predicate pred);

@@ -206,3 +206,9 @@ const std::map<const std::string, map_value_t> taffo::functionWhiteList =
 	CMATH_WHITELIST_FUN("tanh",  &handleCallToTanh),
 	CMATH_WHITELIST_FUN("rand",  &handleCallToRand)
 };
+
+const std::pair<std::unique_ptr<llvm::Regex>, map_value_t> taffo::libmStubMatchList[] =
+{
+	std::make_pair(LIBM_STUB_REGEX("sin"), &handleCallToSin),
+	std::make_pair(LIBM_STUB_REGEX("cos"), &handleCallToCos)
+};

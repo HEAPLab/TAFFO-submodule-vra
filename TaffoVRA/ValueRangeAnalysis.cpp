@@ -576,7 +576,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	// first check if it is among the whitelisted functions we can handle
 	generic_range_ptr_t res = nullptr;
 	if (arg_scalar_ranges.size() == arg_ranges.size()) {
-		res = handleMathCallInstruction(arg_scalar_ranges, calledFunctionName);
+		res = handleMathCallInstruction(arg_scalar_ranges, callee);
 	}
 
 	if (res) {

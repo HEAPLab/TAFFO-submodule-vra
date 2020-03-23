@@ -6,6 +6,7 @@
 #include <map>
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
+#include "llvm/IR/Function.h"
 
 using namespace taffo;
 
@@ -15,8 +16,8 @@ using namespace taffo;
 
 /** Handle binary instructions */
 range_ptr_t taffo::handleBinaryInstruction(const range_ptr_t &op1,
-                                           const range_ptr_t &op2,
-                                           const unsigned OpCode)
+					   const range_ptr_t &op2,
+					   const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::Add:
@@ -59,7 +60,7 @@ range_ptr_t taffo::handleBinaryInstruction(const range_ptr_t &op1,
 
 #if LLVM_VERSION > 7
 range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
-                                          const unsigned OpCode)
+					  const unsigned OpCode)
 {
 	switch (OpCode) {
 		case llvm::Instruction::FNeg:
@@ -98,7 +99,7 @@ generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
 			return copyRange(scalar);
 			break;
 		case llvm::Instruction::FPTrunc:
-		  	return handleFPTrunc(scalar, dest);
+			return handleFPTrunc(scalar, dest);
 		case llvm::Instruction::FPExt:
 			return copyRange(scalar);
 			break;
@@ -121,18 +122,25 @@ generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
 
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t taffo::handleMathCallInstruction(const std::list<range_ptr_t>& ops,
-                                             const std::string &function)
+					     const llvm::Function *function)
 {
-	const auto it = functionWhiteList.find(function);
+	const auto it = functionWhiteList.find(function->getName());
 	if (it != functionWhiteList.end()) {
 		return it->second(ops);
+	}
+
+	if (function->getLinkage() == llvm::GlobalValue::LinkageTypes::ExternalWeakLinkage) {
+		for (auto &stub_info : libmStubMatchList) {
+			if (stub_info.first->match(function->getName()))
+				return stub_info.second(ops);
+		}
 	}
 	return nullptr;
 }
 
 /** Handle call to known math functions. Return nullptr if unknown */
 generic_range_ptr_t taffo::handleCompare(const std::list<generic_range_ptr_t>& ops,
-                                         const llvm::CmpInst::Predicate pred)
+					 const llvm::CmpInst::Predicate pred)
 {
 	switch (pred) {
 		case llvm::CmpInst::Predicate::FCMP_FALSE:
@@ -431,7 +439,7 @@ range_ptr_t taffo::handleFPTrunc(const range_ptr_t &gop,
 
 /** boolean Xor instruction */
 range_ptr_t taffo::handleBooleanXor(const range_ptr_t &op1,
-                                    const range_ptr_t &op2)
+				    const range_ptr_t &op2)
 {
 	if (!op1 || !op2) {
 		return getGenericBoolRange();
@@ -447,7 +455,7 @@ range_ptr_t taffo::handleBooleanXor(const range_ptr_t &op1,
 
 /** boolean And instruction */
 range_ptr_t taffo::handleBooleanAnd(const range_ptr_t &op1,
-                                    const range_ptr_t &op2)
+				    const range_ptr_t &op2)
 {
 	if (!op1 || !op2) {
 		return getGenericBoolRange();
@@ -463,7 +471,7 @@ range_ptr_t taffo::handleBooleanAnd(const range_ptr_t &op1,
 
 /** boolean Or instruction */
 range_ptr_t taffo::handleBooleanOr(const range_ptr_t &op1,
-                                   const range_ptr_t &op2)
+				   const range_ptr_t &op2)
 {
 	if (!op1 || !op2) {
 		return getGenericBoolRange();
