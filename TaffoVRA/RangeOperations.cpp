@@ -122,13 +122,20 @@ generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
 
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t taffo::handleMathCallInstruction(const std::list<range_ptr_t>& ops,
-					     const llvm::Function *function)
+					     const std::string &function)
 {
-	const auto it = functionWhiteList.find(function->getName());
+	const auto it = functionWhiteList.find(function);
 	if (it != functionWhiteList.end()) {
 		return it->second(ops);
 	}
+	return nullptr;
+}
 
+/** Handle call to TAFFO-libm function stub.
+  * Return nullptr if it is not a TAFFO-libm function stub. */
+range_ptr_t taffo::handleLibmStubCallInstruction(const std::list<range_ptr_t>& ops,
+						 const llvm::Function *function)
+{
 	if (function->getLinkage() == llvm::GlobalValue::LinkageTypes::ExternalWeakLinkage) {
 		for (auto &stub_info : libmStubMatchList) {
 			if (stub_info.first->match(function->getName()))

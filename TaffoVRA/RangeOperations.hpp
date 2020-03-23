@@ -31,7 +31,12 @@ generic_range_ptr_t handleCastInstruction(const generic_range_ptr_t &op,
 
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
-                                      const llvm::Function *function);
+                                      const std::string &function);
+
+/** Handle call to TAFFO-libm function stub.
+  * Return nullptr if it is not a TAFFO-libm function stub. */
+range_ptr_t handleLibmStubCallInstruction(const std::list<range_ptr_t>& ops,
+                                          const llvm::Function *function);
 
 generic_range_ptr_t handleCompare(const std::list<generic_range_ptr_t>& ops,
                                   const llvm::CmpInst::Predicate pred);

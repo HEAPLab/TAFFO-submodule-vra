@@ -134,7 +134,7 @@ void ValueRangeAnalysis::harvestMetadata(Module &M)
 					for (auto& v: i.operands()) {
 						int parentWeight = -1;
 						if (Argument* a = dyn_cast<Argument>(v.get())) {
-						  	parentWeight = argsW[a->getArgNo()];
+							parentWeight = argsW[a->getArgNo()];
 						} else if (isa<Instruction>(v.get()) || isa<GlobalVariable>(v.get())) {
 							parentWeight = MDManager.retrieveInputInfoInitWeightMetadata(v.get());
 						} else {
@@ -230,11 +230,11 @@ void ValueRangeAnalysis::processModule(Module &M)
 
 void ValueRangeAnalysis::processFunction(llvm::Function& F)
 {
-        LLVM_DEBUG(dbgs() << "\n" DEBUG_HEAD " Processing function " << F.getName() << "...\n");
+	LLVM_DEBUG(dbgs() << "\n" DEBUG_HEAD " Processing function " << F.getName() << "...\n");
 	// if already available, no need to execute again
 	generic_range_ptr_t tmp = find_ret_val(&F);
 	if (tmp != nullptr) {
-	        LLVM_DEBUG(dbgs() << " done already, aborting.\n");
+		LLVM_DEBUG(dbgs() << " done already, aborting.\n");
 		return;
 	}
 
@@ -245,7 +245,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 	std::list<range_node_ptr_t>::iterator derived_info_it, derived_info_end;
 	auto input_arg_lookup = fun_arg_input.find(&F);
 	if (input_arg_lookup != fun_arg_input.end()) {
-        	input_info_it = input_arg_lookup->second.begin();
+		input_info_it = input_arg_lookup->second.begin();
 		input_info_end = input_arg_lookup->second.end();
 		has_input_info = input_info_it != input_info_end;
 	}
@@ -306,13 +306,13 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 		} else {
 			auto successors = llvm::successors(current_bb);
 			for (llvm::BasicBlock* succ : successors) {
-			  	auto succ_pri = bb_priority.find(succ);
+				auto succ_pri = bb_priority.find(succ);
 				if (succ_pri == bb_priority.end()) {
 					bb_queue.insert(succ);
 					bb_priority[succ] = 0;
 				} else if (succ_pri->second > 0) {
 					bb_queue.insert(succ);
-				        succ_pri->second -= bb_base_priority;
+					succ_pri->second -= bb_base_priority;
 				}
 			}
 		}
@@ -320,7 +320,7 @@ void ValueRangeAnalysis::processFunction(llvm::Function& F)
 		// update current_bb
 		if (bb_queue.empty()) {
 			if (bb_unvisited_set.empty()) {
-			  	current_bb = nullptr;
+				current_bb = nullptr;
 			} else {
 				llvm::BasicBlock* bb_ptr = *bb_unvisited_set.begin();
 				current_bb = bb_ptr;
@@ -357,7 +357,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		else if (Instruction::isCast(opCode))
 		{
 			logInstruction(&i);
-		        const llvm::Value* op = i.getOperand(0);
+			const llvm::Value* op = i.getOperand(0);
 			const generic_range_ptr_t info = fetchInfo(op);
 			const auto res = handleCastInstruction(info, opCode, i.getType());
 			saveValueInfo(&i, res);
@@ -367,7 +367,7 @@ void ValueRangeAnalysis::processBasicBlock(llvm::BasicBlock& BB)
 		}
 		else if (Instruction::isBinaryOp(opCode))
 		{
-		        logInstruction(&i);
+			logInstruction(&i);
 			const llvm::Value* op1 = i.getOperand(0);
 			const llvm::Value* op2 = i.getOperand(1);
 			const auto node1 = getNode(op1);
@@ -576,14 +576,27 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 	// first check if it is among the whitelisted functions we can handle
 	generic_range_ptr_t res = nullptr;
 	if (arg_scalar_ranges.size() == arg_ranges.size()) {
-		res = handleMathCallInstruction(arg_scalar_ranges, callee);
-	}
-
-	if (res) {
-		saveValueInfo(call, res);
-		logInfo("whitelisted");
-		logRangeln(call);
-		return;
+		res = handleMathCallInstruction(arg_scalar_ranges, calledFunctionName);
+		if (res) {
+			saveValueInfo(call, res);
+			logInfo("whitelisted");
+			logRangeln(call);
+			return;
+		}
+		res = handleLibmStubCallInstruction(arg_scalar_ranges, callee);
+		if (res) {
+			saveValueInfo(call, res);
+			logInfo("TAFFO-libm stub");
+			logRangeln(call);
+			std::list<range_ptr_t>::iterator arg_scalar_it = arg_scalar_ranges.begin();
+			for (llvm::Argument &formal_arg : callee->args()) {
+				saveValueInfo(&formal_arg, *arg_scalar_it);
+				++arg_scalar_it;
+				if (arg_scalar_it == arg_scalar_ranges.end())
+					break;
+			}
+			return;
+		}
 	}
 
 	// if not a whitelisted then try to fetch it from Module
@@ -603,7 +616,7 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		if (call_count <= find_recursion_count(f)) {
 			// Can process
 			// update parameter metadata
-		        LLVM_DEBUG(dbgs() << "processing function...\n");
+			LLVM_DEBUG(dbgs() << "processing function...\n");
 			fun_arg_derived[f] = arg_ranges;
 			processFunction(*f);
 			LLVM_DEBUG(dbgs() << "[TAFFO][VRA] Finished processing call "
@@ -1237,7 +1250,7 @@ void ValueRangeAnalysis::saveValueInfo(const llvm::Value* v, const generic_range
 {
 	if (range_node_ptr_t node = getNode(v)) {
 		if (!node->hasRange() && !node->hasParent()) {
-  			node->setRange(info);
+			node->setRange(info);
 			return;
 		}
 
@@ -1344,7 +1357,7 @@ void ValueRangeAnalysis::setRange(range_node_ptr_t node, const generic_range_ptr
 			}
 
 			range_s_ptr_t parent = child;
-		        int child_idx = -1;
+			int child_idx = -1;
 			for (auto offset_it = offset.rbegin();
 			     offset_it != offset.rend(); ++offset_it) {
 				for (unsigned idx : *offset_it) {
@@ -1401,13 +1414,13 @@ void ValueRangeAnalysis::emitError(const std::string& message)
 
 void ValueRangeAnalysis::logInstruction(const llvm::Value* v)
 {
-        assert(v != nullptr);
-        LLVM_DEBUG(dbgs() << DEBUG_HEAD << *v << " : ");
+	assert(v != nullptr);
+	LLVM_DEBUG(dbgs() << DEBUG_HEAD << *v << " : ");
 }
 
 std::string ValueRangeAnalysis::to_string(const generic_range_ptr_t& range)
 {
-        if (range != nullptr) {
+	if (range != nullptr) {
 		const range_ptr_t scalar = std::dynamic_ptr_cast<range_t>(range);
 		if (scalar != nullptr) {
 			return "[" + std::to_string(scalar->min()) + ", "
@@ -1441,7 +1454,7 @@ void ValueRangeAnalysis::logRangeln(const generic_range_ptr_t& range)
 
 void ValueRangeAnalysis::logInfo(const llvm::StringRef info)
 {
-        LLVM_DEBUG(dbgs() << "(" << info << ") ");
+	LLVM_DEBUG(dbgs() << "(" << info << ") ");
 }
 
 void ValueRangeAnalysis::logInfoln(const llvm::StringRef info)
@@ -1452,5 +1465,5 @@ void ValueRangeAnalysis::logInfoln(const llvm::StringRef info)
 
 void ValueRangeAnalysis::logError(const llvm::StringRef error)
 {
-        LLVM_DEBUG(dbgs() << error << "\n");
+	LLVM_DEBUG(dbgs() << error << "\n");
 }
