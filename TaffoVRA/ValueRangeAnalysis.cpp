@@ -4,6 +4,7 @@
 #include "RangeOperations.hpp"
 #include "MemSSAUtils.hpp"
 #include "TopologicalBBSort.hpp"
+#include "IndirectCallWhitelist.hpp"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
@@ -556,12 +557,19 @@ void ValueRangeAnalysis::handleCallBase(const llvm::Instruction* call)
 		logError("indirect calls not supported yet");
 		return;
 	}
-	const std::string calledFunctionName = callee->getName();
+	std::string calledFunctionName = callee->getName();
+
+    // Structures containing arguments ranges
+    std::list<range_node_ptr_t> arg_ranges;
+    std::list<range_ptr_t> arg_scalar_ranges;
+    // Fetch call's arguments
+    auto arg_it = call_i->arg_begin();
+
+    // Patch function name and arguments if indirect
+    handleIndirectCall(calledFunctionName, arg_it, arg_ranges);
 
 	// fetch ranges of arguments
-	std::list<range_node_ptr_t> arg_ranges;
-	std::list<range_ptr_t> arg_scalar_ranges;
-	for(auto arg_it = call_i->arg_begin(); arg_it != call_i->arg_end(); ++arg_it)
+	for(; arg_it != call_i->arg_end(); ++arg_it)
 	{
 		if (isa<Constant>(*arg_it)) fetchInfo(*arg_it);
 		arg_ranges.push_back(getOrCreateNode(*arg_it));

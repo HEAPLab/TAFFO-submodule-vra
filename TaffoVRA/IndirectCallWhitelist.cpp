@@ -1,9 +1,12 @@
 #include "IndirectCallWhitelist.hpp"
 
-llvm::Function* handleCallToKmpcFork(llvm::User::op_iterator& arg_it, std::list<taffo::range_node_ptr_t> arg_ranges) {
+using namespace taffo;
+
+/** Patch the __kmpc_fork_call for parallel and for regions in OpenMP **/
+void handleCallToKmpcFork(std::string& callee, llvm::User::const_op_iterator& arg_it, std::list<taffo::range_node_ptr_t>& arg_ranges) {
     // Extract the function from the third argument
     auto micro_task = llvm::dyn_cast<llvm::ConstantExpr>(arg_it + 2)->getOperand(0);
-    auto callee = llvm::dyn_cast<llvm::Function>(micro_task);
+    callee = llvm::dyn_cast<llvm::Function>(micro_task)->getName();
 
     // Add empty ranges to account for internal OpenMP parameters
     arg_ranges.push_back(nullptr);
@@ -11,6 +14,16 @@ llvm::Function* handleCallToKmpcFork(llvm::User::op_iterator& arg_it, std::list<
 
     // Skip already analyzed arguments
     arg_it += 3;
-
-    return callee;
 }
+
+const std::map<const std::string, handler_function> indirectCallFunctions = {
+        {"__kmpc_fork_call", &handleCallToKmpcFork}
+};
+
+void taffo::handleIndirectCall(std::string& callee, llvm::User::const_op_iterator& arg_it, std::list<taffo::range_node_ptr_t>& arg_ranges) {
+    auto it = indirectCallFunctions.find(callee);
+    if (it != indirectCallFunctions.end()) {
+        it->second(callee, arg_it, arg_ranges);
+    }
+}
+
