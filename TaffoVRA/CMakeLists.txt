@@ -11,6 +11,12 @@ add_llvm_library(TaffoVRA MODULE
   MemSSAUtils.hpp
   CodeInterpreter.cpp
   CodeInterpreter.hpp
+  VRAStore.cpp
+  VRAStore.hpp
+  ValueRangeAnalyzer.cpp
+  ValueRangeAnalyzer.hpp
+  VRAGlobalStore.cpp
+  VRAGlobalStore.hpp
 
   PLUGIN_TOOL
   opt

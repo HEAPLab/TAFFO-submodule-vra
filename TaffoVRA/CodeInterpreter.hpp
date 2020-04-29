@@ -7,50 +7,76 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/LoopInfo.h"
 
+#include <Metadata.h>
+#include "RangeNode.hpp"
+
 namespace taffo {
 
 class CodeInterpreter;
+class CodeAnalyzer;
 
-class CodeAnalyzer {
+class AnalysisStore {
 public:
-  virtual void convexMerge(const CodeAnalyzer &Other) = 0;
-  virtual std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter *CI) = 0;
+  virtual void convexMerge(const AnalysisStore &Other) = 0;
+  virtual std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) = 0;
+
+  enum AnalysisStoreKind { ASK_VRAGlobalStore, ASK_ValueRangeAnalyzer };
+  AnalysisStoreKind getKind() const { return Kind; }
+
+protected:
+  AnalysisStore(AnalysisStoreKind K) : Kind(K) {}
+
+private:
+  const AnalysisStoreKind Kind;
+};
+
+class CodeAnalyzer : public AnalysisStore {
+public:
   virtual std::shared_ptr<CodeAnalyzer> clone() = 0;
   virtual void analyzeInstruction(llvm::Instruction *I) = 0;
   virtual void setPathLocalInfo(std::shared_ptr<CodeAnalyzer> SuccAnalyzer,
                                 llvm::Instruction *TermInstr, unsigned SuccIdx) = 0;
-  virtual bool requiresInterpretation(llvm::Instruction *I) const;
-  virtual void prepareForCall(llvm::Instruction *I, const CodeAnalyzer &GlobalAnalyzer);
-  virtual void returnFromCall(llvm::Instruction *I, const CodeAnalyzer &GlobalAnalyzer);
-
-  virtual ~CodeAnalyzer() = default;
+  virtual bool requiresInterpretation(llvm::Instruction *I) const = 0;
+  virtual void prepareForCall(llvm::Instruction *I) = 0;
+  virtual void returnFromCall(llvm::Instruction *I) = 0;
 
   bool isFinal() const { return Final; }
   void setFinal() { Final = true; }
 
-  enum CodeAnalyzerKind { CAK_VRA };
-  CodeAnalyzerKind getKind() const { return Kind; }
+  static bool classof(const AnalysisStore *AS) {
+    return AS->getKind() >= ASK_VRAGlobalStore
+      && AS->getKind() <= ASK_ValueRangeAnalyzer;
+  }
 
 protected:
-  CodeAnalyzer(CodeAnalyzerKind K) : Final(false), Kind(K) {}
+  CodeAnalyzer(AnalysisStoreKind K) : AnalysisStore(K), Final(false) {}
 
 private:
   bool Final;
-  const CodeAnalyzerKind Kind;
 };
 
 class CodeInterpreter {
-  CodeInterpreter(llvm::Pass &P, std::shared_ptr<CodeAnalyzer> GlobalAnalyzer)
-    : GlobalAnalyzer(GlobalAnalyzer), BBAnalyzers(), Pass(P), LoopInfo(nullptr) {}
+public:
+  CodeInterpreter(llvm::Pass &P, std::shared_ptr<AnalysisStore> GlobalStore)
+    : GlobalStore(GlobalStore), BBAnalyzers(), Pass(P), LoopInfo(nullptr) {}
 
   void interpretFunction(llvm::Function *F);
-  std::shared_ptr<CodeAnalyzer> getAnalyzerForValue(const llvm::Value *V) const;
+  // TODO change to getAnalysisStoreForValue
+  std::shared_ptr<AnalysisStore> getAnalyzerForValue(const llvm::Value *V) const;
+
+  std::shared_ptr<AnalysisStore> getGlobalStore() const {
+    return GlobalStore;
+  }
+
+  llvm::Pass& getPass() const {
+    return Pass;
+  }
 
   static void getAnalysisUsage(llvm::AnalysisUsage &AU);
 
 protected:
-  std::shared_ptr<CodeAnalyzer> GlobalAnalyzer;
-  llvm::DenseMap<llvm::BasicBlock *, std::shared_ptr<CodeAnalyzer> > BBAnalyzers;
+  std::shared_ptr<AnalysisStore> GlobalStore;
+  llvm::DenseMap<llvm::BasicBlock *, std::shared_ptr<CodeAnalyzer>> BBAnalyzers;
   llvm::Pass &Pass;
   llvm::LoopInfo *LoopInfo;
   llvm::DenseMap<llvm::BasicBlock *, unsigned> LoopIterCount;

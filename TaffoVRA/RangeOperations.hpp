@@ -18,16 +18,17 @@ range_ptr_t handleBinaryInstruction(const range_ptr_t &op1,
                                     const range_ptr_t &op2,
                                     const unsigned OpCode);
 
-#if LLVM_VERSION > 7
 /** Handle unary instructions */
 range_ptr_t handleUnaryInstruction(const range_ptr_t &op,
                                    const unsigned OpCode);
-#endif
 
 /** Handle cast instructions */
 generic_range_ptr_t handleCastInstruction(const generic_range_ptr_t &op,
 					  const unsigned OpCode,
 					  const llvm::Type *dest);
+
+/** Return true if this function call can be handled by taffo::handleMathCallInstruction */
+bool isMathCallInstruction(const std::string &function);
 
 /** Handle call to known math functions. Return nullptr if unknown */
 range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,

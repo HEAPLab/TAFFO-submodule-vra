@@ -13,14 +13,13 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
 
   std::deque<llvm::BasicBlock *> Worklist;
   Worklist.push_back(&F->getEntryBlock());
-  BBAnalyzers[&F->getEntryBlock()] = GlobalAnalyzer->newCodeAnalyzer(this);
+  BBAnalyzers[&F->getEntryBlock()] = GlobalStore->newCodeAnalyzer(*this);
 
   while (!Worklist.empty()) {
     llvm::BasicBlock *BB = Worklist.front();
     Worklist.pop_front();
 
     if (hasUnvisitedPredecessors(BB)) {
-      Worklist.push_back(BB);
       continue;
     }
 
@@ -46,12 +45,18 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
     }
 
     CurAnalyzer->setFinal();
+    GlobalStore->convexMerge(*CurAnalyzer);
   }
 }
 
-std::shared_ptr<CodeAnalyzer> CodeInterpreter::getAnalyzerForValue(const llvm::Value *V) const {
-  if (llvm::isa<llvm::GlobalValue>(V) || llvm::isa<llvm::Argument>(V))
-    return GlobalAnalyzer;
+std::shared_ptr<AnalysisStore> CodeInterpreter::getAnalyzerForValue(const llvm::Value *V) const {
+  // TODO add assert(v) here and see what happens
+  if (!V) return nullptr;
+
+  if (llvm::isa<llvm::GlobalValue>(V)
+      || llvm::isa<llvm::Argument>(V)
+      || llvm::isa<llvm::Function>(V))
+    return GlobalStore;
 
   if (const llvm::Instruction *I = llvm::dyn_cast<llvm::Instruction>(V)) {
     auto BBAIt = BBAnalyzers.find(I->getParent());
@@ -135,19 +140,17 @@ void CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> Curr
 
 void CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
                                     llvm::Instruction *I) {
-  CurAnalyzer->prepareForCall(I, *GlobalAnalyzer);
+  CurAnalyzer->prepareForCall(I);
 
-  llvm::CallBase *CB = llvm::dyn_cast<llvm::CallBase>(I);
-  assert(CB);
+  llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   llvm::Function *F = CB->getCalledFunction();
-  if (!F)
+  if (!F || F->empty())
     return;
 
   if (updateRecursionCount(F))
     interpretFunction(F);
 
-  // TODO: Make things so that returns are saved in the global analyzer
-  CurAnalyzer->returnFromCall(I, *GlobalAnalyzer);
+  CurAnalyzer->returnFromCall(I);
 
   updateLoopInfo(I->getFunction());
 }

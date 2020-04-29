@@ -57,7 +57,6 @@ range_ptr_t taffo::handleBinaryInstruction(const range_ptr_t &op1,
 	return nullptr;
 }
 
-#if LLVM_VERSION > 7
 range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
                                           const unsigned OpCode)
 {
@@ -71,7 +70,6 @@ range_ptr_t taffo::handleUnaryInstruction(const range_ptr_t &op,
 	}
 	return nullptr;
 }
-#endif
 
 /** Cast instructions */
 generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
@@ -117,6 +115,12 @@ generic_range_ptr_t taffo::handleCastInstruction(const generic_range_ptr_t &op,
 			break;
 	}
 	return nullptr;
+}
+
+/** Return true if this function call can be handled by taffo::handleMathCallInstruction */
+bool taffo::isMathCallInstruction(const std::string &function)
+{
+  return functionWhiteList.count(function);
 }
 
 /** Handle call to known math functions. Return nullptr if unknown */
