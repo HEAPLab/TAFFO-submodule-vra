@@ -1,39 +1,44 @@
 #include "CodeInterpreter.hpp"
 
 #include <deque>
+#include "llvm/Support/Debug.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/InstrTypes.h"
 #include <Metadata.h>
+
+// TODO remove from here
+#define DEBUG_TYPE "taffo-vra"
 
 namespace taffo {
 
 void CodeInterpreter::interpretFunction(llvm::Function *F) {
   updateLoopInfo(F);
-  retrieveLoopIterCount(F);
+  retrieveLoopTripCount(F);
 
+  llvm::BasicBlock *EntryBlock = &F->getEntryBlock();
   std::deque<llvm::BasicBlock *> Worklist;
-  Worklist.push_back(&F->getEntryBlock());
-  BBAnalyzers[&F->getEntryBlock()] = GlobalStore->newCodeAnalyzer(*this);
+  Worklist.push_back(EntryBlock);
+  EvalCount[EntryBlock] = 1U;
+  BBAnalyzers[EntryBlock] = GlobalStore->newCodeAnalyzer(*this);
 
   while (!Worklist.empty()) {
     llvm::BasicBlock *BB = Worklist.front();
     Worklist.pop_front();
-
-    if (hasUnvisitedPredecessors(BB)) {
-      continue;
-    }
 
     auto CAIt = BBAnalyzers.find(BB);
     assert(CAIt != BBAnalyzers.end());
     std::shared_ptr<CodeAnalyzer> CurAnalyzer = CAIt->second;
     std::shared_ptr<CodeAnalyzer> PathLocal = CurAnalyzer->clone();
 
+    LLVM_DEBUG(llvm::dbgs() << "[TAFFO][VRA] " << BB->getName() << "\n");
     for (llvm::Instruction &I : *BB) {
       if (CurAnalyzer->requiresInterpretation(&I))
 	interpretCall(CurAnalyzer, &I);
       else
 	CurAnalyzer->analyzeInstruction(&I);
     }
+
+    --EvalCount[BB];
 
     llvm::Instruction *Term = BB->getTerminator();
     for (unsigned NS = 0; NS < Term->getNumSuccessors(); ++NS) {
@@ -44,7 +49,6 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
       }
     }
 
-    CurAnalyzer->setFinal();
     GlobalStore->convexMerge(*CurAnalyzer);
   }
 }
@@ -66,25 +70,9 @@ std::shared_ptr<AnalysisStore> CodeInterpreter::getAnalyzerForValue(const llvm::
   return nullptr;
 }
 
-bool CodeInterpreter::wasVisited(llvm::BasicBlock *BB) const {
-  auto BBAIt = BBAnalyzers.find(BB);
-  if (BBAIt == BBAnalyzers.end())
-    return false;
-
-  return BBAIt->second->isFinal();
-}
-
-bool CodeInterpreter::hasUnvisitedPredecessors(llvm::BasicBlock *BB) const {
-  for (llvm::BasicBlock *Pred : predecessors(BB)) {
-    if (!wasVisited(Pred) && !isLoopBackEdge(Pred, BB))
-      return true;
-  }
-  return false;
-}
-
 bool CodeInterpreter::isLoopBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const {
   assert(LoopInfo);
-  return LoopInfo->isLoopHeader(Dst) || getLoopForBackEdge(Src, Dst);
+  return LoopInfo->isLoopHeader(Dst) && getLoopForBackEdge(Src, Dst);
 }
 
 llvm::Loop *CodeInterpreter::getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const {
@@ -97,25 +85,46 @@ llvm::Loop *CodeInterpreter::getLoopForBackEdge(llvm::BasicBlock *Src, llvm::Bas
 }
 
 bool CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
-  if (!wasVisited(Dst))
-    return true;
+  // Don't follow edge if Dst has unvisited predecessors.
+  unsigned SrcEC = EvalCount[Src];
+  for (llvm::BasicBlock *Pred : predecessors(Dst)) {
+    auto PredECIt = EvalCount.find(Pred);
+    if ((PredECIt == EvalCount.end() || PredECIt->second > SrcEC)
+        && !isLoopBackEdge(Pred, Dst))
+      return false;
+  }
 
   assert(LoopInfo);
-  llvm::Loop *L = getLoopForBackEdge(Src, Dst);
-  if (!L || L->getLoopLatch() != Src)
-    return false; // We only support simple loops, for now.
-
-  auto LICIt = LoopIterCount.find(Src);
-  if (LICIt == LoopIterCount.end())
-    return false;
-
-  unsigned &Remaining = LICIt->second;
-  if (Remaining > 0) {
-    --Remaining;
+  llvm::Loop *DstLoop = LoopInfo->getLoopFor(Dst);
+  if (DstLoop && !DstLoop->contains(Src)) {
+    // Entering new loop.
+    assert(DstLoop->getHeader() == Dst && "Dst must be Loop header.");
+    unsigned TripCount = 1U;
+    if (llvm::BasicBlock *Latch = DstLoop->getLoopLatch()) {
+      TripCount = LoopTripCount[Latch];
+    }
+    for (llvm::BasicBlock *LBB : DstLoop->blocks()) {
+      EvalCount[LBB] = TripCount;
+    }
+    if (DstLoop->isLoopExiting(Dst)) {
+      ++EvalCount[Dst];
+    }
     return true;
   }
-  else
-    return false;
+  llvm::Loop *SrcLoop = LoopInfo->getLoopFor(Src);
+  if (SrcLoop) {
+    if (SrcEC == 0U && SrcLoop->isLoopExiting(Src)) {
+      // Done with evaluating this loop: we follow the exiting edge only.
+      return !SrcLoop->contains(Dst);
+    }
+    // We do not follow the exiting edge (we assume there's only one).
+    return SrcLoop->contains(Dst);
+  }
+  if (!SrcLoop && !DstLoop) {
+    // There's no loop, just evaluate Dst once.
+    EvalCount[Dst] = 1U;
+  }
+  return true;
 }
 
 void CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAnalyzer,
@@ -160,25 +169,23 @@ void CodeInterpreter::updateLoopInfo(llvm::Function *F) {
   LoopInfo = &Pass.getAnalysis<llvm::LoopInfoWrapperPass>(*F).getLoopInfo();
 }
 
-void CodeInterpreter::retrieveLoopIterCount(llvm::Function *F) {
+void CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
   assert(LoopInfo && F);
   llvm::ScalarEvolution *SE = nullptr;
-  for (llvm::Loop *L : *LoopInfo) {
+  for (llvm::Loop *L : LoopInfo->getLoopsInPreorder()) {
     if (llvm::BasicBlock *Latch = L->getLoopLatch()) {
-      unsigned IterCount = 0;
+      unsigned TripCount = 0U;
       // Get user supplied unroll count
       llvm::Optional<unsigned> OUC = mdutils::MetadataManager::retrieveLoopUnrollCount(*L, LoopInfo);
       if (OUC.hasValue()) {
-	IterCount = OUC.getValue();
-      }
-      else {
+	TripCount = OUC.getValue();
+      } else {
 	// Compute loop trip count
 	if (!SE)
 	  SE = &Pass.getAnalysis<llvm::ScalarEvolutionWrapperPass>(*F).getSE();
-	IterCount = SE->getSmallConstantTripCount(L);
+	TripCount = SE->getSmallConstantTripCount(L);
       }
-      if (IterCount > 0)
-	LoopIterCount[Latch] = IterCount;
+      LoopTripCount[Latch] = (TripCount > 0U) ? TripCount : 1U;
     }
   }
 }

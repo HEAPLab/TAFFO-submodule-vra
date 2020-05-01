@@ -2,6 +2,7 @@
 #define TAFFO_CODE_SCHEDULER_HPP
 
 #include <memory>
+#include <cassert>
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Pass.h"
@@ -40,25 +41,20 @@ public:
   virtual void prepareForCall(llvm::Instruction *I) = 0;
   virtual void returnFromCall(llvm::Instruction *I) = 0;
 
-  bool isFinal() const { return Final; }
-  void setFinal() { Final = true; }
-
   static bool classof(const AnalysisStore *AS) {
     return AS->getKind() >= ASK_VRAGlobalStore
       && AS->getKind() <= ASK_ValueRangeAnalyzer;
   }
 
 protected:
-  CodeAnalyzer(AnalysisStoreKind K) : AnalysisStore(K), Final(false) {}
-
-private:
-  bool Final;
+  CodeAnalyzer(AnalysisStoreKind K) : AnalysisStore(K) {}
 };
 
 class CodeInterpreter {
 public:
   CodeInterpreter(llvm::Pass &P, std::shared_ptr<AnalysisStore> GlobalStore)
-    : GlobalStore(GlobalStore), BBAnalyzers(), Pass(P), LoopInfo(nullptr) {}
+    : GlobalStore(GlobalStore), BBAnalyzers(), EvalCount(),
+      Pass(P), LoopInfo(nullptr), LoopTripCount(), RecursionCount() {}
 
   void interpretFunction(llvm::Function *F);
   // TODO change to getAnalysisStoreForValue
@@ -77,14 +73,13 @@ public:
 protected:
   std::shared_ptr<AnalysisStore> GlobalStore;
   llvm::DenseMap<llvm::BasicBlock *, std::shared_ptr<CodeAnalyzer>> BBAnalyzers;
+  llvm::DenseMap<llvm::BasicBlock *, unsigned> EvalCount;
   llvm::Pass &Pass;
   llvm::LoopInfo *LoopInfo;
-  llvm::DenseMap<llvm::BasicBlock *, unsigned> LoopIterCount;
+  llvm::DenseMap<llvm::BasicBlock *, unsigned> LoopTripCount;
   llvm::DenseMap<llvm::Function *, unsigned> RecursionCount;
 
 private:
-  bool wasVisited(llvm::BasicBlock *BB) const;
-  bool hasUnvisitedPredecessors(llvm::BasicBlock *BB) const;
   bool isLoopBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
   llvm::Loop *getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
   bool followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst);
@@ -94,7 +89,7 @@ private:
   void interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
 		     llvm::Instruction *I);
   void updateLoopInfo(llvm::Function *F);
-  void retrieveLoopIterCount(llvm::Function *F);
+  void retrieveLoopTripCount(llvm::Function *F);
   bool updateRecursionCount(llvm::Function *F);
 };
 
