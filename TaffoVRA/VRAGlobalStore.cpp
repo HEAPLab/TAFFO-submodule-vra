@@ -47,12 +47,11 @@ VRAGlobalStore::setArgumentRanges(const llvm::Function &F,
   LLVM_DEBUG(dbgs() << DEBUG_HEAD " Loading argument ranges: ");
   for (const llvm::Argument &formal_arg : F.args()) {
     assert(derived_info_it != derived_info_end);
-    if (*derived_info_it != nullptr) {
-      DerivedRanges[&formal_arg] = *derived_info_it;
-      LLVM_DEBUG(dbgs() << "{ " << formal_arg << " : "
-                 << to_string(fetchInfo(&formal_arg)) << " }, ");
-    }
+    DerivedRanges[&formal_arg] = *derived_info_it;
     ++derived_info_it;
+
+    LLVM_DEBUG(dbgs() << "{ " << formal_arg << " : "
+               << to_string(fetchInfo(&formal_arg)) << " }, ");
   }
   LLVM_DEBUG(dbgs() << "\n");
 }
@@ -366,6 +365,7 @@ VRAGlobalStore::fetchInfo(const llvm::Value* v,
 
   const generic_range_ptr_t Derived = VRAStore::fetchInfo(v);
   if (input_range
+      && Derived
       && std::isa_ptr<VRA_Structured_Range>(Derived)
       && v->getType()->isPointerTy()) {
     // fill null input_range fields with corresponding derived fields

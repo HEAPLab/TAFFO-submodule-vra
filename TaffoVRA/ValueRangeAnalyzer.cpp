@@ -239,11 +239,7 @@ ValueRangeAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
     // fetch ranges of arguments
     std::list<range_ptr_t> ArgScalarRanges;
     for (Value *Arg : CB->args()) {
-      if (const generic_range_ptr_t ArgInfo = fetchInfo(Arg)) {
-        if (const range_ptr_t ArgInfoScalar = std::dynamic_ptr_cast<range_t>(ArgInfo)) {
-          ArgScalarRanges.push_back(ArgInfoScalar);
-        }
-      }
+      ArgScalarRanges.push_back(std::dynamic_ptr_cast_or_null<range_t>(fetchInfo(Arg)));
     }
     generic_range_ptr_t Res = handleMathCallInstruction(ArgScalarRanges, FunctionName);
     saveValueInfo(I, Res);
@@ -466,6 +462,7 @@ ValueRangeAnalyzer::fetchInfo(const llvm::Value* v,
 
   const generic_range_ptr_t Derived = VRAStore::fetchInfo(v);
   if (input_range
+      && Derived
       && std::isa_ptr<VRA_Structured_Range>(Derived)
       && v->getType()->isPointerTy()) {
     // fill null input_range fields with corresponding derived fields

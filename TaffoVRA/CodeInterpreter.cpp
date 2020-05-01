@@ -140,12 +140,12 @@ void CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> Curr
 
 void CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
                                     llvm::Instruction *I) {
-  CurAnalyzer->prepareForCall(I);
-
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   llvm::Function *F = CB->getCalledFunction();
   if (!F || F->empty())
     return;
+
+  CurAnalyzer->prepareForCall(I);
 
   if (updateRecursionCount(F))
     interpretFunction(F);
