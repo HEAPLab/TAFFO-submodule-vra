@@ -386,7 +386,7 @@ ValueRangeAnalyzer::isDescendant(const llvm::Value* parent,
   if (parent == desc) return true;
   while (desc) {
     range_node_ptr_t desc_node = getNode(desc);
-    desc = desc_node->getParent();
+    desc = (desc_node) ? desc_node->getParent() : nullptr;
     if (desc == parent)
       return true;
   }
