@@ -38,6 +38,7 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
 	CurAnalyzer->analyzeInstruction(&I);
     }
 
+    assert(EvalCount[BB] > 0 && "Trying to evaluated block with 0 EvalCount.");
     --EvalCount[BB];
 
     llvm::Instruction *Term = BB->getTerminator();
@@ -114,10 +115,16 @@ bool CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
   llvm::Loop *SrcLoop = LoopInfo->getLoopFor(Src);
   if (SrcLoop) {
     if (SrcEC == 0U && SrcLoop->isLoopExiting(Src)) {
-      // Done with evaluating this loop: we follow the exiting edge only.
-      return !SrcLoop->contains(Dst);
+      // We are in the last evaluation of this loop.
+      if (SrcLoop->contains(Dst)) {
+        // We follow an internal edge only if it still has to be evaluated this time.
+        return EvalCount[Dst] > 0;
+      }
+      // We can follow the exiting edges.
+      EvalCount[Dst] = 1U;
+      return true;
     }
-    // We do not follow the exiting edge (we assume there's only one).
+    // The loop has to be evaluated more times: we do not follow the exiting edges.
     return SrcLoop->contains(Dst);
   }
   if (!SrcLoop && !DstLoop) {
