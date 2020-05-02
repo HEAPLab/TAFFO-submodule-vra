@@ -50,6 +50,7 @@ private:
   const generic_range_ptr_t fetchInfo(const llvm::Value* v, bool derived_or_final = false) override;
   range_node_ptr_t getNode(const llvm::Value* v) const override;
   range_node_ptr_t getOrCreateNode(const llvm::Value* v) override;
+  void setNode(const llvm::Value* V, range_node_ptr_t Node);
 
   // Interface with CodeInterpreter
   std::shared_ptr<VRAGlobalStore> getGlobalStore() const {

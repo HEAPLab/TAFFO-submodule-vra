@@ -392,6 +392,11 @@ VRAGlobalStore::getOrCreateNode(const llvm::Value* v) {
   return nullptr;
 }
 
+void
+VRAGlobalStore::setNode(const llvm::Value* V, range_node_ptr_t Node) {
+  DerivedRanges[V] = Node;
+}
+
 generic_range_ptr_t
 VRAGlobalStore::getUserInput(const llvm::Value *V) const {
   auto UIt = UserInput.find(V);

@@ -310,8 +310,7 @@ ValueRangeAnalyzer::handleStoreInstr(const llvm::Instruction* store) {
       logError("pointer circularity!");
     else {
       const generic_range_ptr_t old_range = fetchInfo(address_param);
-      DerivedRanges[address_param] =
-        make_range_node(value_param, std::vector<unsigned>());
+      setNode(address_param, make_range_node(value_param, std::vector<unsigned>()));
       saveValueInfo(address_param, old_range);
     }
     return;
@@ -335,8 +334,8 @@ ValueRangeAnalyzer::handleLoadInstr(llvm::Instruction* load) {
 
   if (load_i->getType()->isPointerTy()) {
     logInfoln("pointer load");
-    DerivedRanges[load_i] = make_range_node(load_i->getPointerOperand(),
-                                             std::vector<unsigned>());
+    setNode(load_i, make_range_node(load_i->getPointerOperand(),
+                                    std::vector<unsigned>()));
     return nullptr;
   }
 
@@ -498,6 +497,15 @@ ValueRangeAnalyzer::getOrCreateNode(const llvm::Value* v) {
   }
 
   return nullptr;
+}
+
+void
+ValueRangeAnalyzer::setNode(const llvm::Value* V, range_node_ptr_t Node) {
+  if (isa<GlobalVariable>(V) || isa<Argument>(V)) {
+      // set node in global analyzer
+      return getGlobalStore()->setNode(V, Node);
+  }
+  DerivedRanges[V] = Node;
 }
 
 void
