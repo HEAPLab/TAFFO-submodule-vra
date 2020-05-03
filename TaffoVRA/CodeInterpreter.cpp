@@ -12,6 +12,9 @@
 namespace taffo {
 
 void CodeInterpreter::interpretFunction(llvm::Function *F) {
+  DEBUG_WITH_TYPE(GlobalStore->getLogger()->getDebugType(),
+                  GlobalStore->getLogger()->logStartFunction(F));
+
   updateLoopInfo(F);
   retrieveLoopTripCount(F);
 
@@ -30,7 +33,8 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
     std::shared_ptr<CodeAnalyzer> CurAnalyzer = CAIt->second;
     std::shared_ptr<CodeAnalyzer> PathLocal = CurAnalyzer->clone();
 
-    LLVM_DEBUG(llvm::dbgs() << "[TAFFO][VRA] " << BB->getName() << "\n");
+    DEBUG_WITH_TYPE(GlobalStore->getLogger()->getDebugType(),
+                    GlobalStore->getLogger()->logBasicBlock(BB));
     for (llvm::Instruction &I : *BB) {
       if (CurAnalyzer->requiresInterpretation(&I))
 	interpretCall(CurAnalyzer, &I);
@@ -52,6 +56,9 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
 
     GlobalStore->convexMerge(*CurAnalyzer);
   }
+
+  DEBUG_WITH_TYPE(GlobalStore->getLogger()->getDebugType(),
+                  GlobalStore->getLogger()->logEndFunction(F));
 }
 
 std::shared_ptr<AnalysisStore> CodeInterpreter::getAnalyzerForValue(const llvm::Value *V) const {

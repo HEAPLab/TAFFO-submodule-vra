@@ -38,17 +38,17 @@ ValueRangeAnalyzer::analyzeInstruction(llvm::Instruction *I) {
     handleSpecialCall(&i);
   }
   else if (Instruction::isCast(OpCode)) {
-    logInstruction(&i);
+    LLVM_DEBUG(Logger->logInstruction(&i));
     const llvm::Value* op = i.getOperand(0);
     const generic_range_ptr_t info = fetchInfo(op);
     const auto res = handleCastInstruction(info, OpCode, i.getType());
     saveValueInfo(&i, res);
 
-    LLVM_DEBUG(if (!info) logInfo("operand range is null"));
-    logRangeln(&i);
+    LLVM_DEBUG(if (!info) Logger->logInfo("operand range is null"));
+    LLVM_DEBUG(logRangeln(&i));
   }
   else if (Instruction::isBinaryOp(OpCode)) {
-    logInstruction(&i);
+    LLVM_DEBUG(Logger->logInstruction(&i));
     const llvm::Value* op1 = i.getOperand(0);
     const llvm::Value* op2 = i.getOperand(1);
     const range_ptr_t info1 =
@@ -58,20 +58,20 @@ ValueRangeAnalyzer::analyzeInstruction(llvm::Instruction *I) {
     const auto res = handleBinaryInstruction(info1, info2, OpCode);
     saveValueInfo(&i, res);
 
-    LLVM_DEBUG(if (!info1) logInfo("first range is null"));
-    LLVM_DEBUG(if (!info2) logInfo("second range is null"));
-    logRangeln(&i);
+    LLVM_DEBUG(if (!info1) Logger->logInfo("first range is null"));
+    LLVM_DEBUG(if (!info2) Logger->logInfo("second range is null"));
+    LLVM_DEBUG(logRangeln(&i));
   }
   else if (OpCode == llvm::Instruction::FNeg) {
-    logInstruction(&i);
+    LLVM_DEBUG(Logger->logInstruction(&i));
     const llvm::Value* op1 = i.getOperand(0);
     const range_ptr_t info1 =
       std::dynamic_ptr_cast_or_null<range_t>(fetchInfo(op1));
     const auto res = handleUnaryInstruction(info1, OpCode);
     saveValueInfo(&i, res);
 
-    LLVM_DEBUG(if (!info1) logInfo("operand range is null"));
-    logRangeln(&i);
+    LLVM_DEBUG(if (!info1) Logger->logInfo("operand range is null"));
+    LLVM_DEBUG(logRangeln(&i));
   }
   else {
     generic_range_ptr_t tmp;
@@ -83,7 +83,7 @@ ValueRangeAnalyzer::analyzeInstruction(llvm::Instruction *I) {
       case llvm::Instruction::Load:
         tmp = handleLoadInstr(&i);
         saveValueInfo(&i, tmp);
-        logRangeln(&i);
+        LLVM_DEBUG(logRangeln(&i));
         break;
       case llvm::Instruction::Store:
         handleStoreInstr(&i);
@@ -92,13 +92,13 @@ ValueRangeAnalyzer::analyzeInstruction(llvm::Instruction *I) {
         tmp = handleGEPInstr(&i);
         break;
       case llvm::Instruction::Fence:
-        emitError("Handling of Fence not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of Fence not supported yet"));
         break; // TODO implement
       case llvm::Instruction::AtomicCmpXchg:
-        emitError("Handling of AtomicCmpXchg not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of AtomicCmpXchg not supported yet"));
         break; // TODO implement
       case llvm::Instruction::AtomicRMW:
-        emitError("Handling of AtomicRMW not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of AtomicRMW not supported yet"));
         break; // TODO implement
 
         // other operations
@@ -123,31 +123,31 @@ ValueRangeAnalyzer::analyzeInstruction(llvm::Instruction *I) {
         break;
       case llvm::Instruction::UserOp1: // TODO implement
       case llvm::Instruction::UserOp2: // TODO implement
-        emitError("Handling of UserOp not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of UserOp not supported yet"));
         break;
       case llvm::Instruction::VAArg: // TODO implement
-        emitError("Handling of VAArg not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of VAArg not supported yet"));
         break;
       case llvm::Instruction::ExtractElement: // TODO implement
-        emitError("Handling of ExtractElement not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of ExtractElement not supported yet"));
         break;
       case llvm::Instruction::InsertElement: // TODO implement
-        emitError("Handling of InsertElement not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of InsertElement not supported yet"));
         break;
       case llvm::Instruction::ShuffleVector: // TODO implement
-        emitError("Handling of ShuffleVector not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of ShuffleVector not supported yet"));
         break;
       case llvm::Instruction::ExtractValue: // TODO implement
-        emitError("Handling of ExtractValue not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of ExtractValue not supported yet"));
         break;
       case llvm::Instruction::InsertValue: // TODO implement
-        emitError("Handling of InsertValue not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of InsertValue not supported yet"));
         break;
       case llvm::Instruction::LandingPad: // TODO implement
-        emitError("Handling of LandingPad not supported yet");
+        LLVM_DEBUG(Logger->logErrorln("Handling of LandingPad not supported yet"));
         break;
       default:
-        emitError("unhandled instruction " + std::to_string(OpCode));
+        LLVM_DEBUG(Logger->logErrorln("unhandled instruction " + std::to_string(OpCode)));
         break;
     }
   } // end else
@@ -184,10 +184,10 @@ ValueRangeAnalyzer::prepareForCall(llvm::Instruction *I) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   assert(!CB->isIndirectCall());
 
-  logInstruction(I);
-  LLVM_DEBUG(dbgs() << "preparing for function interpretation...\n\n");
+  LLVM_DEBUG(Logger->logInstruction(I));
+  LLVM_DEBUG(Logger->logInfoln("preparing for function interpretation..."));
 
-  LLVM_DEBUG(dbgs() << DEBUG_HEAD " Loading argument ranges: ");
+  LLVM_DEBUG(Logger->lineHead(); llvm::dbgs() << "Loading argument ranges: ");
   // fetch ranges of arguments
   std::list<range_node_ptr_t> ArgRanges;
   for (Value *Arg : CB->args()) {
@@ -195,9 +195,9 @@ ValueRangeAnalyzer::prepareForCall(llvm::Instruction *I) {
       fetchInfo(Arg);
     ArgRanges.push_back(getOrCreateNode(Arg));
 
-    LLVM_DEBUG(dbgs() << to_string(fetchInfo(Arg)) << ", ");
+    LLVM_DEBUG(llvm::dbgs() << VRALogger::toString(fetchInfo(Arg)) << ", ");
   }
-  LLVM_DEBUG(dbgs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "\n");
 
   getGlobalStore()->setArgumentRanges(*CB->getCalledFunction(), ArgRanges);
 }
@@ -207,16 +207,14 @@ ValueRangeAnalyzer::returnFromCall(llvm::Instruction *I) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   assert(!CB->isIndirectCall());
 
-  LLVM_DEBUG(dbgs() << "\n");
-  logInstruction(I);
-  logInfo("returning from call");
+  LLVM_DEBUG(Logger->logInstruction(I); Logger->logInfo("returning from call"));
 
   generic_range_ptr_t Ret = getGlobalStore()->findRetVal(CB->getCalledFunction());
   if (Ret) {
     saveValueInfo(I, Ret);
-    logRangeln(I);
+    LLVM_DEBUG(logRangeln(I));
   } else {
-    logInfoln("function returns nothing");
+    LLVM_DEBUG(Logger->logInfoln("function returns nothing"));
   }
 }
 
@@ -228,12 +226,12 @@ ValueRangeAnalyzer::returnFromCall(llvm::Instruction *I) {
 void
 ValueRangeAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
   const CallBase* CB = cast<CallBase>(I);
-  logInstruction(I);
+  LLVM_DEBUG(Logger->logInstruction(I));
 
   // fetch function name
   llvm::Function* Callee = CB->getCalledFunction();
   if (Callee == nullptr) {
-    logError("indirect calls not supported");
+    LLVM_DEBUG(Logger->logInfo("indirect calls not supported"));
     return;
   }
 
@@ -246,8 +244,8 @@ ValueRangeAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
     }
     generic_range_ptr_t Res = handleMathCallInstruction(ArgScalarRanges, FunctionName);
     saveValueInfo(I, Res);
-    logInfo("whitelisted");
-    VRAStore::logRangeln(Res);
+    LLVM_DEBUG(Logger->logInfo("whitelisted"));
+    LLVM_DEBUG(Logger->logRangeln(Res));
   }
   else if (Callee->isIntrinsic()) {
     const auto IntrinsicsID = Callee->getIntrinsicID();
@@ -256,24 +254,24 @@ ValueRangeAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
         handleMemCpyIntrinsics(CB);
         break;
       default:
-        logInfo("skipping intrinsic " + FunctionName);
+        LLVM_DEBUG(Logger->logInfo("skipping intrinsic " + FunctionName));
     }
   }
   else {
-    logError("unsupported call");
+    LLVM_DEBUG(Logger->logInfo("unsupported call"));
   }
 }
 
 void
 ValueRangeAnalyzer::handleMemCpyIntrinsics(const llvm::Instruction* memcpy) {
   assert(isa<CallInst>(memcpy) || isa<InvokeInst>(memcpy));
-  logInfo("llvm.memcpy");
+  LLVM_DEBUG(Logger->logInfo("llvm.memcpy"));
   const BitCastInst* dest_bitcast =
     dyn_cast<BitCastInst>(memcpy->getOperand(0U));
   const BitCastInst* src_bitcast =
     dyn_cast<BitCastInst>(memcpy->getOperand(1U));
   if (!(dest_bitcast && src_bitcast)) {
-    logError("operand is not bitcast, aborting");
+    LLVM_DEBUG(Logger->logInfo("operand is not bitcast, aborting"));
     return;
   }
   const Value* dest = dest_bitcast->getOperand(0U);
@@ -281,36 +279,36 @@ ValueRangeAnalyzer::handleMemCpyIntrinsics(const llvm::Instruction* memcpy) {
 
   const generic_range_ptr_t src_range = fetchInfo(src);
   saveValueInfo(dest, src_range);
-  VRAStore::logRangeln(src_range);
+  LLVM_DEBUG(Logger->logRangeln(src_range));
 }
 
 void
 ValueRangeAnalyzer::handleReturn(const llvm::Instruction* ret) {
   const llvm::ReturnInst* ret_i = cast<llvm::ReturnInst>(ret);
-  logInstruction(ret);
+  LLVM_DEBUG(Logger->logInstruction(ret));
   const llvm::Value* ret_val = ret_i->getReturnValue();
   const llvm::Function* ret_fun = ret_i->getFunction();
   generic_range_ptr_t range = fetchInfo(ret_val);
   generic_range_ptr_t partial = getGlobalStore()->findRetVal(ret_fun);
   generic_range_ptr_t returned = getUnionRange(partial, range);
   getGlobalStore()->setRetVal(ret_fun, returned);
-  VRAStore::logRangeln(returned);
+  LLVM_DEBUG(Logger->logRangeln(returned));
 }
 
 void
 ValueRangeAnalyzer::handleStoreInstr(const llvm::Instruction* store) {
   const llvm::StoreInst* store_i = cast<llvm::StoreInst>(store);
-  logInstruction(store);
+  LLVM_DEBUG(Logger->logInstruction(store));
   const llvm::Value* address_param = store_i->getPointerOperand();
   const llvm::Value* value_param = store_i->getValueOperand();
 
   if (value_param->getType()->isPointerTy()) {
-    logInfoln("pointer store");
+    LLVM_DEBUG(Logger->logInfoln("pointer store"));
     if (isa<llvm::ConstantPointerNull>(value_param))
       return;
 
     if (isDescendant(address_param, value_param))
-      logError("pointer circularity!");
+      LLVM_DEBUG(Logger->logInfo("pointer circularity!"));
     else {
       const generic_range_ptr_t old_range = fetchInfo(address_param);
       setNode(address_param, make_range_node(value_param, std::vector<unsigned>()));
@@ -322,17 +320,17 @@ ValueRangeAnalyzer::handleStoreInstr(const llvm::Instruction* store) {
   const generic_range_ptr_t range = fetchInfo(value_param);
   saveValueInfo(address_param, range);
   saveValueInfo(store_i, range);
-  logRangeln(store_i);
+  LLVM_DEBUG(logRangeln(store_i));
   return;
 }
 
 generic_range_ptr_t
 ValueRangeAnalyzer::handleLoadInstr(llvm::Instruction* load) {
   llvm::LoadInst* load_i = cast<llvm::LoadInst>(load);
-  logInstruction(load);
+  LLVM_DEBUG(Logger->logInstruction(load));
 
   if (load_i->getType()->isPointerTy()) {
-    logInfo("pointer load");
+    LLVM_DEBUG(Logger->logInfo("pointer load"));
     setNode(load_i, make_range_node(load_i->getPointerOperand(),
                                     std::vector<unsigned>()));
     return nullptr;
@@ -357,13 +355,13 @@ ValueRangeAnalyzer::handleLoadInstr(llvm::Instruction* load) {
 generic_range_ptr_t
 ValueRangeAnalyzer::handleGEPInstr(const llvm::Instruction* gep) {
   const llvm::GetElementPtrInst* gep_i = dyn_cast<llvm::GetElementPtrInst>(gep);
-  logInstruction(gep_i);
+  LLVM_DEBUG(Logger->logInstruction(gep_i));
 
   range_node_ptr_t node = getNode(gep);
   if (node != nullptr) {
     if (node->hasRange())
       return node->getRange();
-    logInfoln("has node");
+    LLVM_DEBUG(Logger->logInfoln("has node"));
   } else {
     std::vector<unsigned> offset;
     if (!extractGEPOffset(gep_i->getSourceElementType(),
@@ -395,7 +393,7 @@ ValueRangeAnalyzer::isDescendant(const llvm::Value* parent,
 range_ptr_t
 ValueRangeAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
   const llvm::CmpInst* cmp_i = cast<llvm::CmpInst>(cmp);
-  logInstruction(cmp);
+  LLVM_DEBUG(Logger->logInstruction(cmp));
   const llvm::CmpInst::Predicate pred = cmp_i->getPredicate();
   std::list<generic_range_ptr_t> ranges;
   for (unsigned index = 0; index < cmp_i->getNumOperands(); index++) {
@@ -404,7 +402,7 @@ ValueRangeAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
     ranges.push_back(op_range);
   }
   range_ptr_t result = std::dynamic_ptr_cast_or_null<range_t>(handleCompare(ranges, pred));
-  VRAStore::logRangeln(result);
+  LLVM_DEBUG(Logger->logRangeln(result));
   return result;
 }
 
@@ -414,7 +412,7 @@ ValueRangeAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
   if (phi_n->getNumIncomingValues() < 1) {
     return nullptr;
   }
-  logInstruction(phi);
+  LLVM_DEBUG(Logger->logInstruction(phi));
   const llvm::Value* op0 = phi_n->getIncomingValue(0);
   generic_range_ptr_t res = fetchInfo(op0);
   for (unsigned index = 1; index < phi_n->getNumIncomingValues(); index++) {
@@ -422,18 +420,18 @@ ValueRangeAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
     generic_range_ptr_t op_range = fetchInfo(op);
     res = getUnionRange(res, op_range);
   }
-  VRAStore::logRangeln(res);
+  LLVM_DEBUG(Logger->logRangeln(res));
   return res;
 }
 
 generic_range_ptr_t
 ValueRangeAnalyzer::handleSelect(const llvm::Instruction* i) {
   const llvm::SelectInst* sel = cast<llvm::SelectInst>(i);
-  logInstruction(sel);
+  LLVM_DEBUG(Logger->logInstruction(sel));
   // TODO: actually handle comparison.
   generic_range_ptr_t res = getUnionRange(fetchInfo(sel->getFalseValue()),
                                           fetchInfo(sel->getTrueValue()));
-  VRAStore::logRangeln(res);
+  LLVM_DEBUG(Logger->logRangeln(res));
   return res;
 }
 
@@ -502,5 +500,5 @@ ValueRangeAnalyzer::setNode(const llvm::Value* V, range_node_ptr_t Node) {
 void
 ValueRangeAnalyzer::logRangeln(const llvm::Value* v) {
   LLVM_DEBUG(if (getGlobalStore()->getUserInput(v)) dbgs() << "(from metadata) ");
-  VRAStore::logRangeln(v);
+  LLVM_DEBUG(Logger->logRangeln(fetchInfo(v)));
 }

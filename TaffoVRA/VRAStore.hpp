@@ -8,10 +8,8 @@
 #include <list>
 #include <vector>
 
+#include "VRALogger.hpp"
 #include "RangeNode.hpp"
-
-#define DEBUG_TYPE "taffo-vra"
-#define DEBUG_HEAD "[TAFFO][VRA]"
 
 namespace taffo {
 
@@ -34,22 +32,14 @@ public:
 
 protected:
   llvm::DenseMap<const llvm::Value*, range_node_ptr_t> DerivedRanges;
+  std::shared_ptr<VRALogger> Logger;
 
   bool extractGEPOffset(const llvm::Type* source_element_type,
                         const llvm::iterator_range<llvm::User::const_op_iterator> indices,
                         std::vector<unsigned>& offset);
 
-  // Logging stuff
-  static void emitError(const std::string& message);
-  static std::string to_string(const generic_range_ptr_t& range);
-  static void logInstruction(const llvm::Value* v);
-  virtual void logRangeln(const llvm::Value* v);
-  static void logRangeln(const generic_range_ptr_t& range);
-  static void logInfo(const llvm::StringRef info);
-  static void logInfoln(const llvm::StringRef info);
-  static void logError(const llvm::StringRef error);
-
-  VRAStore(VRAStoreKind K) : Kind(K), DerivedRanges() {}
+  VRAStore(VRAStoreKind K, std::shared_ptr<VRALogger> L)
+    : Kind(K), DerivedRanges(), Logger(L) {}
 
 private:
   const VRAStoreKind Kind;

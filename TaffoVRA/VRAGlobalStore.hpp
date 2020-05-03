@@ -6,16 +6,19 @@
 
 #include "VRAStore.hpp"
 #include "CodeInterpreter.hpp"
+#include "VRALogger.hpp"
 
 namespace taffo {
 
 class VRAGlobalStore : protected VRAStore, public AnalysisStore {
 public:
   VRAGlobalStore()
-    : VRAStore(VRASK_VRAGlobalStore), AnalysisStore(ASK_VRAGlobalStore) {}
+    : VRAStore(VRASK_VRAGlobalStore, std::make_shared<VRALogger>()),
+      AnalysisStore(ASK_VRAGlobalStore) {}
 
   void convexMerge(const AnalysisStore &Other) override;
   std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) override;
+  std::shared_ptr<CILogger> getLogger() const override { return Logger; }
 
   // Function handling stuff
   generic_range_ptr_t findRetVal(const llvm::Function* F);

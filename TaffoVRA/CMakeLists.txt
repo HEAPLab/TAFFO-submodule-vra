@@ -17,6 +17,7 @@ add_llvm_library(TaffoVRA MODULE
   ValueRangeAnalyzer.hpp
   VRAGlobalStore.cpp
   VRAGlobalStore.hpp
+  VRALogger.hpp
 
   PLUGIN_TOOL
   opt

@@ -4,6 +4,7 @@
 #include "VRAStore.hpp"
 #include "VRAGlobalStore.hpp"
 #include "CodeInterpreter.hpp"
+#include "VRALogger.hpp"
 
 namespace taffo {
 
@@ -11,10 +12,14 @@ class ValueRangeAnalyzer : protected VRAStore, public CodeAnalyzer {
 public:
 
   ValueRangeAnalyzer(CodeInterpreter &CI)
-    : VRAStore(VRASK_ValueRangeAnalyzer), CodeAnalyzer(ASK_ValueRangeAnalyzer), CodeInt(CI) {}
+    : VRAStore(VRASK_ValueRangeAnalyzer,
+               std::static_ptr_cast<VRALogger>(CI.getGlobalStore()->getLogger())),
+      CodeAnalyzer(ASK_ValueRangeAnalyzer),
+      CodeInt(CI) {}
 
   void convexMerge(const AnalysisStore &Other) override;
   std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) override;
+  std::shared_ptr<CILogger> getLogger() const override { return Logger; }
   std::shared_ptr<CodeAnalyzer> clone() override;
   void analyzeInstruction(llvm::Instruction *I) override;
   void setPathLocalInfo(std::shared_ptr<CodeAnalyzer> SuccAnalyzer,
@@ -73,7 +78,8 @@ private:
     return nullptr;
   }
 
-  void logRangeln(const llvm::Value* v) override;
+  // Logging
+  void logRangeln(const llvm::Value* v);
 
   CodeInterpreter &CodeInt;
 };

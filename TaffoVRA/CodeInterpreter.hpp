@@ -16,10 +16,28 @@ namespace taffo {
 class CodeInterpreter;
 class CodeAnalyzer;
 
+class CILogger {
+public:
+  virtual const char *getDebugType() const = 0;
+  virtual void logBasicBlock(const llvm::BasicBlock *BB) const = 0;
+  virtual void logStartFunction(const llvm::Function *F) = 0;
+  virtual void logEndFunction(const llvm::Function *F) = 0;
+
+  enum CILoggerKind { CILK_VRALogger };
+  CILoggerKind getKind() const { return Kind; }
+
+protected:
+  CILogger(CILoggerKind K) : Kind(K) {}
+
+private:
+  CILoggerKind Kind;
+};
+
 class AnalysisStore {
 public:
   virtual void convexMerge(const AnalysisStore &Other) = 0;
   virtual std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) = 0;
+  virtual std::shared_ptr<CILogger> getLogger() const = 0;
 
   enum AnalysisStoreKind { ASK_VRAGlobalStore, ASK_ValueRangeAnalyzer };
   AnalysisStoreKind getKind() const { return Kind; }

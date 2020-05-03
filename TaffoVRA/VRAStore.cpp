@@ -204,17 +204,17 @@ VRAStore::fetchConstant(const llvm::Constant* kval) {
   }
   const llvm::ConstantTokenNone* none_i = dyn_cast<llvm::ConstantTokenNone>(kval);
   if (none_i) {
-    emitError("Warning: treating llvm::ConstantTokenNone as 0");
+    LLVM_DEBUG(Logger->logInfo("Warning: treating llvm::ConstantTokenNone as 0"));
     return make_range(0, 0);
   }
   const llvm::ConstantPointerNull* null_i = dyn_cast<llvm::ConstantPointerNull>(kval);
   if (null_i) {
-    emitError("Warning: treating llvm::ConstantPointerNull as 0");
+    LLVM_DEBUG(Logger->logInfo("Warning: treating llvm::ConstantPointerNull as 0"));
     return make_range(0, 0);
   }
   const llvm::UndefValue* undef_i = dyn_cast<llvm::UndefValue>(kval);
   if (undef_i) {
-    emitError("Warning: treating llvm::UndefValue as nullptr");
+    LLVM_DEBUG(Logger->logInfo("Warning: treating llvm::UndefValue as nullptr"));
     return nullptr;
   }
   const llvm::ConstantAggregateZero* agg_zero_i = dyn_cast<llvm::ConstantAggregateZero>(kval);
@@ -233,7 +233,7 @@ VRAStore::fetchConstant(const llvm::Constant* kval) {
       const unsigned any_value = 0;
       return fetchConstant(agg_zero_i->getElementValue(any_value));
     }
-    emitError("Found aggrated zeros which is neither struct neither array neither vector");
+    LLVM_DEBUG(Logger->logInfo("Found aggrated zeros which is neither struct neither array neither vector"));
     return nullptr;
   }
   const llvm::ConstantDataSequential* seq = dyn_cast<llvm::ConstantDataSequential>(kval);
@@ -250,7 +250,7 @@ VRAStore::fetchConstant(const llvm::Constant* kval) {
   const llvm::ConstantData* data = dyn_cast<llvm::ConstantData>(kval);
   if (data) {
     // FIXME should never happen -- all subcases handled before
-    emitError("Extract value from llvm::ConstantData not implemented yet");
+    LLVM_DEBUG(Logger->logInfo("Extract value from llvm::ConstantData not implemented yet"));
     return nullptr;
   }
   if (const llvm::ConstantExpr* cexp_i = dyn_cast<llvm::ConstantExpr>(kval)) {
@@ -260,14 +260,14 @@ VRAStore::fetchConstant(const llvm::Constant* kval) {
       else
         return nullptr;
     }
-    emitError("Could not fold a llvm::ConstantExpr");
+    LLVM_DEBUG(Logger->logInfo("Could not fold a llvm::ConstantExpr"));
     return nullptr;
   }
   const llvm::ConstantAggregate* aggr_i = dyn_cast<llvm::ConstantAggregate>(kval);
   if (aggr_i) {
     // TODO implement
     if (dyn_cast<llvm::ConstantStruct>(aggr_i)) {
-      emitError("Constant structs not supported yet");
+      LLVM_DEBUG(Logger->logInfo("Constant structs not supported yet"));
       return nullptr;
     } else {
       // ConstantArray or ConstantVector
@@ -278,7 +278,7 @@ VRAStore::fetchConstant(const llvm::Constant* kval) {
   }
   const llvm::BlockAddress* block_i = dyn_cast<llvm::BlockAddress>(kval);
   if (block_i) {
-    emitError("Could not fetch range from llvm::BlockAddress");
+    LLVM_DEBUG(Logger->logInfo("Could not fetch range from llvm::BlockAddress"));
     return nullptr;
   }
   const llvm::GlobalValue* gv_i = dyn_cast<llvm::GlobalValue>(kval);
@@ -291,30 +291,30 @@ VRAStore::fetchConstant(const llvm::Constant* kval) {
           return fetchConstant(init_val);
         }
       }
-      emitError("Could not derive range from a Global Variable");
+      LLVM_DEBUG(Logger->logInfo("Could not derive range from a Global Variable"));
       return nullptr;
     }
     const llvm::GlobalAlias* alias_i = dyn_cast<llvm::GlobalAlias>(kval);
     if (alias_i) {
-      emitError("Found alias");
+      LLVM_DEBUG(Logger->logInfo("Found alias"));
       const llvm::Constant* aliasee = alias_i->getAliasee();
       return (aliasee) ? fetchConstant(aliasee) : nullptr;
     }
     const llvm::Function* f = dyn_cast<llvm::Function>(kval);
     if (f) {
-      emitError("Could not derive range from a Constant Function");
+      LLVM_DEBUG(Logger->logInfo("Could not derive range from a Constant Function"));
       return nullptr;
     }
     const llvm::GlobalIFunc* fun_decl = dyn_cast<llvm::GlobalIFunc>(kval);
     if (fun_decl) {
-      emitError("Could not derive range from a Function declaration");
+      LLVM_DEBUG(Logger->logInfo("Could not derive range from a Function declaration"));
       return nullptr;
     }
     // this line should never be reached
-    emitError("Could not fetch range from llvm::GlobalValue");
+    LLVM_DEBUG(Logger->logInfo("Could not fetch range from llvm::GlobalValue"));
     return nullptr;
   }
-  emitError("Could not fetch range from llvm::Constant");
+  LLVM_DEBUG(Logger->logInfo("Could not fetch range from llvm::Constant"));
   return nullptr;
 }
 
@@ -336,75 +336,10 @@ VRAStore::extractGEPOffset(const llvm::Type* source_element_type,
         cast<StructType>(source_element_type)->getTypeAtIndex(n);
       LLVM_DEBUG(dbgs() << n << " ");
     } else {
-      emitError("Index of GEP not constant");
+      LLVM_DEBUG(Logger->logErrorln("Index of GEP not constant"));
       return false;
     }
   }
   LLVM_DEBUG(dbgs() << "\n");
   return true;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Logging Stuff
-////////////////////////////////////////////////////////////////////////////////
-
-void
-VRAStore::emitError(const std::string& message) {
-  LLVM_DEBUG(dbgs() << "[TAFFO] Value Range Analysis: " << message << "\n");
-  return;
-}
-
-void
-VRAStore::logInstruction(const llvm::Value* v) {
-  assert(v != nullptr);
-  LLVM_DEBUG(dbgs() << DEBUG_HEAD << *v << " : ");
-}
-
-std::string
-VRAStore::to_string(const generic_range_ptr_t& range) {
-  if (range != nullptr) {
-    const range_ptr_t scalar = std::dynamic_ptr_cast<range_t>(range);
-    if (scalar != nullptr) {
-      return "[" + std::to_string(scalar->min()) + ", "
-        + std::to_string(scalar->max()) + "]";
-    } else {
-      const range_s_ptr_t structured = std::dynamic_ptr_cast<range_s_t>(range);
-      assert(structured != nullptr);
-      std::string result("{ ");
-      for (const generic_range_ptr_t field : structured->ranges()) {
-        result.append(to_string(field));
-        result.append(", ");
-      }
-      result.append("}");
-      return result;
-    }
-  } else {
-    return "null range!";
-  }
-}
-
-void
-VRAStore::logRangeln(const llvm::Value* v) {
-  logRangeln(fetchInfo(v));
-}
-
-void
-VRAStore::logRangeln(const generic_range_ptr_t& range) {
-  LLVM_DEBUG(dbgs() << to_string(range) << "\n");
-}
-
-void
-VRAStore::logInfo(const llvm::StringRef info) {
-  LLVM_DEBUG(dbgs() << "(" << info << ") ");
-}
-
-void
-VRAStore::logInfoln(const llvm::StringRef info) {
-  logInfo(info);
-  LLVM_DEBUG(dbgs() << "\n");
-}
-
-void
-VRAStore::logError(const llvm::StringRef error) {
-  LLVM_DEBUG(dbgs() << error << "\n");
 }

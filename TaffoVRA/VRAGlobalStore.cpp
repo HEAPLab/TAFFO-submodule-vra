@@ -141,7 +141,8 @@ VRAGlobalStore::harvestMetadata(Module &M) {
         }
         if (!root)
           continue;
-        LLVM_DEBUG(dbgs() << "[harvestMetadata] Considering input metadata of instruction " << i << " (weight=" << weight << ")\n");
+        LLVM_DEBUG(Logger->lineHead();
+                   dbgs() << " Considering input metadata of " << i << " (weight=" << weight << ")\n");
         if (InputInfo *II = dyn_cast<InputInfo>(MDI)) {
           if (isValidRange(II->IRange.get())) {
             const llvm::Value* i_ptr = &i;
