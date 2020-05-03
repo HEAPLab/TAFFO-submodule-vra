@@ -241,6 +241,8 @@ generic_range_ptr_t taffo::handleCompare(const std::list<generic_range_ptr_t>& o
 		case llvm::CmpInst::Predicate::FCMP_UNO: // one of the operand is NaN
 		// TODO implement
 		break;
+          default:
+            break;
 	}
 	return nullptr;
 }
