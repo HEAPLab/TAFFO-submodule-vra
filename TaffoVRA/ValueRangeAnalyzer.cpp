@@ -328,11 +328,7 @@ ValueRangeAnalyzer::handleStoreInstr(const llvm::Instruction* store) {
 
 generic_range_ptr_t
 ValueRangeAnalyzer::handleLoadInstr(llvm::Instruction* load) {
-  llvm::LoadInst* load_i = dyn_cast<llvm::LoadInst>(load);
-  if (!load_i) {
-    emitError("Could not convert load instruction to LoadInst");
-    return nullptr;
-  }
+  llvm::LoadInst* load_i = cast<llvm::LoadInst>(load);
   logInstruction(load);
 
   if (load_i->getType()->isPointerTy()) {
@@ -398,11 +394,7 @@ ValueRangeAnalyzer::isDescendant(const llvm::Value* parent,
 
 range_ptr_t
 ValueRangeAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
-  const llvm::CmpInst* cmp_i = dyn_cast<llvm::CmpInst>(cmp);
-  if (!cmp_i) {
-    emitError("Could not convert Compare instruction to CmpInst");
-    return nullptr;
-  }
+  const llvm::CmpInst* cmp_i = cast<llvm::CmpInst>(cmp);
   logInstruction(cmp);
   const llvm::CmpInst::Predicate pred = cmp_i->getPredicate();
   std::list<generic_range_ptr_t> ranges;
@@ -418,11 +410,7 @@ ValueRangeAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
 
 generic_range_ptr_t
 ValueRangeAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
-  const llvm::PHINode* phi_n = dyn_cast<llvm::PHINode>(phi);
-  if (!phi_n) {
-    emitError("Could not convert Phi instruction to PHINode");
-    return nullptr;
-  }
+  const llvm::PHINode* phi_n = cast<llvm::PHINode>(phi);
   if (phi_n->getNumIncomingValues() < 1) {
     return nullptr;
   }
