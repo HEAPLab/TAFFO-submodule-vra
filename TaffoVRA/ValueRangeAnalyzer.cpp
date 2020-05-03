@@ -168,9 +168,8 @@ ValueRangeAnalyzer::requiresInterpretation(llvm::Instruction *I) const {
       if (Called->isIntrinsic())
         return false;
 
-      if (CB->getNumArgOperands() == 1U
-          && isMathCallInstruction(Called->getName())) {
-          return false;
+      if (isMathCallInstruction(Called->getName())) {
+        return false;
       }
     }
     // I is a call, but we have no special way of handling it.
