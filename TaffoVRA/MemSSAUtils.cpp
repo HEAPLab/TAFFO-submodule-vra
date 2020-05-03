@@ -12,7 +12,7 @@ MemSSAUtils::getDefiningValues(Instruction *i) {
   findClobberingValues(i, MemSSA.getMemoryAccess(i));
 
   return Res;
- }
+}
 
 void MemSSAUtils::findLOEValue(Instruction *i) {
   Value *pointer = (cast<LoadInst>(i))->getPointerOperand();

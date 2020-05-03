@@ -24,8 +24,8 @@ range_ptr_t handleUnaryInstruction(const range_ptr_t &op,
 
 /** Handle cast instructions */
 generic_range_ptr_t handleCastInstruction(const generic_range_ptr_t &op,
-					  const unsigned OpCode,
-					  const llvm::Type *dest);
+                                          const unsigned OpCode,
+                                          const llvm::Type *dest);
 
 /** Return true if this function call can be handled by taffo::handleMathCallInstruction */
 bool isMathCallInstruction(const std::string &function);
