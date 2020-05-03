@@ -44,16 +44,11 @@ VRAGlobalStore::setArgumentRanges(const llvm::Function &F,
   auto derived_info_it = AARanges.begin();
   auto derived_info_end = AARanges.end();
 
-  LLVM_DEBUG(dbgs() << DEBUG_HEAD " Loading argument ranges: ");
   for (const llvm::Argument &formal_arg : F.args()) {
     assert(derived_info_it != derived_info_end);
-    DerivedRanges[&formal_arg] = *derived_info_it;
+    setNode(&formal_arg, *derived_info_it);
     ++derived_info_it;
-
-    LLVM_DEBUG(dbgs() << "{ " << formal_arg << " : "
-               << to_string(fetchInfo(&formal_arg)) << " }, ");
   }
-  LLVM_DEBUG(dbgs() << "\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////

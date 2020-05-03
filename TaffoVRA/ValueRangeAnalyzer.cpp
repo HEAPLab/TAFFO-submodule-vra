@@ -187,13 +187,17 @@ ValueRangeAnalyzer::prepareForCall(llvm::Instruction *I) {
   logInstruction(I);
   LLVM_DEBUG(dbgs() << "preparing for function interpretation...\n\n");
 
+  LLVM_DEBUG(dbgs() << DEBUG_HEAD " Loading argument ranges: ");
   // fetch ranges of arguments
   std::list<range_node_ptr_t> ArgRanges;
   for (Value *Arg : CB->args()) {
     if (isa<Constant>(Arg))
       fetchInfo(Arg);
     ArgRanges.push_back(getOrCreateNode(Arg));
+
+    LLVM_DEBUG(dbgs() << to_string(fetchInfo(Arg)) << ", ");
   }
+  LLVM_DEBUG(dbgs() << "\n");
 
   getGlobalStore()->setArgumentRanges(*CB->getCalledFunction(), ArgRanges);
 }
@@ -332,7 +336,7 @@ ValueRangeAnalyzer::handleLoadInstr(llvm::Instruction* load) {
   logInstruction(load);
 
   if (load_i->getType()->isPointerTy()) {
-    logInfoln("pointer load");
+    logInfo("pointer load");
     setNode(load_i, make_range_node(load_i->getPointerOperand(),
                                     std::vector<unsigned>()));
     return nullptr;
