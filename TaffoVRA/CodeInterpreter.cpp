@@ -6,8 +6,6 @@
 #include "llvm/IR/InstrTypes.h"
 #include <Metadata.h>
 
-// TODO remove from here
-#define DEBUG_TYPE "taffo-vra"
 
 namespace taffo {
 

@@ -1,6 +1,6 @@
 #include "VRAGlobalStore.hpp"
 
-#include "ValueRangeAnalyzer.hpp"
+#include "VRAnalyzer.hpp"
 #include "RangeOperations.hpp"
 
 using namespace llvm;
@@ -8,8 +8,8 @@ using namespace taffo;
 
 void
 VRAGlobalStore::convexMerge(const AnalysisStore &Other) {
-  if (isa<ValueRangeAnalyzer>(Other)) {
-    VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<ValueRangeAnalyzer>(Other)));
+  if (isa<VRAnalyzer>(Other)) {
+    VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAnalyzer>(Other)));
   } else {
     VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAGlobalStore>(Other)));
   }
@@ -17,7 +17,7 @@ VRAGlobalStore::convexMerge(const AnalysisStore &Other) {
 
 std::shared_ptr<CodeAnalyzer>
 VRAGlobalStore::newCodeAnalyzer(CodeInterpreter &CI) {
-  return std::make_shared<ValueRangeAnalyzer>(CI);
+  return std::make_shared<VRAnalyzer>(CI);
 }
 
 generic_range_ptr_t

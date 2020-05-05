@@ -39,7 +39,7 @@ public:
   virtual std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) = 0;
   virtual std::shared_ptr<CILogger> getLogger() const = 0;
 
-  enum AnalysisStoreKind { ASK_VRAGlobalStore, ASK_ValueRangeAnalyzer };
+  enum AnalysisStoreKind { ASK_VRAGlobalStore, ASK_VRAnalyzer };
   AnalysisStoreKind getKind() const { return Kind; }
 
 protected:
@@ -61,7 +61,7 @@ public:
 
   static bool classof(const AnalysisStore *AS) {
     return AS->getKind() >= ASK_VRAGlobalStore
-      && AS->getKind() <= ASK_ValueRangeAnalyzer;
+      && AS->getKind() <= ASK_VRAnalyzer;
   }
 
 protected:

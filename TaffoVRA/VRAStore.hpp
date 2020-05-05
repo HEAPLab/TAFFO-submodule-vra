@@ -27,7 +27,7 @@ public:
                         std::list<std::vector<unsigned>>& offset);
   virtual generic_range_ptr_t fetchConstant(const llvm::Constant* v);
 
-  enum VRAStoreKind { VRASK_VRAGlobalStore, VRASK_ValueRangeAnalyzer };
+  enum VRAStoreKind { VRASK_VRAGlobalStore, VRASK_VRAnalyzer };
   VRAStoreKind getKind() const { return Kind; }
 
 protected:

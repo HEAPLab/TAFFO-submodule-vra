@@ -1,5 +1,5 @@
-#ifndef TAFFO_VALUE_RANGE_ANALIZER_HPP
-#define TAFFO_VALUE_RANGE_ANALIZER_HPP
+#ifndef TAFFO_VRANALIZER_HPP
+#define TAFFO_VRANALIZER_HPP
 
 #include "VRAStore.hpp"
 #include "VRAGlobalStore.hpp"
@@ -8,13 +8,13 @@
 
 namespace taffo {
 
-class ValueRangeAnalyzer : protected VRAStore, public CodeAnalyzer {
+class VRAnalyzer : protected VRAStore, public CodeAnalyzer {
 public:
 
-  ValueRangeAnalyzer(CodeInterpreter &CI)
-    : VRAStore(VRASK_ValueRangeAnalyzer,
+  VRAnalyzer(CodeInterpreter &CI)
+    : VRAStore(VRASK_VRAnalyzer,
                std::static_ptr_cast<VRALogger>(CI.getGlobalStore()->getLogger())),
-      CodeAnalyzer(ASK_ValueRangeAnalyzer),
+      CodeAnalyzer(ASK_VRAnalyzer),
       CodeInt(CI) {}
 
   void convexMerge(const AnalysisStore &Other) override;
@@ -29,11 +29,11 @@ public:
   void returnFromCall(llvm::Instruction *I) override;
 
   static bool classof(const AnalysisStore *AS) {
-    return AS->getKind() == ASK_ValueRangeAnalyzer;
+    return AS->getKind() == ASK_VRAnalyzer;
   }
 
   static bool classof(const VRAStore *VS) {
-    return VS->getKind() == VRASK_ValueRangeAnalyzer;
+    return VS->getKind() == VRASK_VRAnalyzer;
   }
 
 private:
@@ -68,8 +68,8 @@ private:
       return nullptr;
     }
 
-    if (std::shared_ptr<ValueRangeAnalyzer> VRA =
-        std::dynamic_ptr_cast<ValueRangeAnalyzer>(AStore)) {
+    if (std::shared_ptr<VRAnalyzer> VRA =
+        std::dynamic_ptr_cast<VRAnalyzer>(AStore)) {
       return std::static_ptr_cast<VRAStore>(VRA);
     } else if (std::shared_ptr<VRAGlobalStore> VRAGS =
         std::dynamic_ptr_cast<VRAGlobalStore>(AStore)) {

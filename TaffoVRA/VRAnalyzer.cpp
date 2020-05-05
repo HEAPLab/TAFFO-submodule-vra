@@ -1,4 +1,4 @@
-#include "ValueRangeAnalyzer.hpp"
+#include "VRAnalyzer.hpp"
 
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Debug.h"
@@ -10,26 +10,26 @@ using namespace llvm;
 using namespace taffo;
 
 void
-ValueRangeAnalyzer::convexMerge(const AnalysisStore &Other) {
-  if (isa<ValueRangeAnalyzer>(Other)) {
-    VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<ValueRangeAnalyzer>(Other)));
+VRAnalyzer::convexMerge(const AnalysisStore &Other) {
+  if (isa<VRAnalyzer>(Other)) {
+    VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAnalyzer>(Other)));
   } else {
     VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAGlobalStore>(Other)));
   }
 }
 
 std::shared_ptr<CodeAnalyzer>
-ValueRangeAnalyzer::newCodeAnalyzer(CodeInterpreter &CI) {
-  return std::make_shared<ValueRangeAnalyzer>(CI);
+VRAnalyzer::newCodeAnalyzer(CodeInterpreter &CI) {
+  return std::make_shared<VRAnalyzer>(CI);
 }
 
 std::shared_ptr<CodeAnalyzer>
-ValueRangeAnalyzer::clone() {
-  return std::make_shared<ValueRangeAnalyzer>(*this);
+VRAnalyzer::clone() {
+  return std::make_shared<VRAnalyzer>(*this);
 }
 
 void
-ValueRangeAnalyzer::analyzeInstruction(llvm::Instruction *I) {
+VRAnalyzer::analyzeInstruction(llvm::Instruction *I) {
   assert(I);
   Instruction &i = *I;
   const unsigned OpCode = i.getOpcode();
@@ -154,13 +154,13 @@ ValueRangeAnalyzer::analyzeInstruction(llvm::Instruction *I) {
 }
 
 void
-ValueRangeAnalyzer::setPathLocalInfo(std::shared_ptr<CodeAnalyzer> SuccAnalyzer,
+VRAnalyzer::setPathLocalInfo(std::shared_ptr<CodeAnalyzer> SuccAnalyzer,
                                      llvm::Instruction *TermInstr, unsigned SuccIdx) {
   // TODO extract more specific ranges from cmp
 }
 
 bool
-ValueRangeAnalyzer::requiresInterpretation(llvm::Instruction *I) const {
+VRAnalyzer::requiresInterpretation(llvm::Instruction *I) const {
   assert(I);
   if (llvm::CallBase *CB = llvm::dyn_cast<llvm::CallBase>(I)) {
     if (!CB->isIndirectCall()) {
@@ -180,7 +180,7 @@ ValueRangeAnalyzer::requiresInterpretation(llvm::Instruction *I) const {
 }
 
 void
-ValueRangeAnalyzer::prepareForCall(llvm::Instruction *I) {
+VRAnalyzer::prepareForCall(llvm::Instruction *I) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   assert(!CB->isIndirectCall());
 
@@ -203,7 +203,7 @@ ValueRangeAnalyzer::prepareForCall(llvm::Instruction *I) {
 }
 
 void
-ValueRangeAnalyzer::returnFromCall(llvm::Instruction *I) {
+VRAnalyzer::returnFromCall(llvm::Instruction *I) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   assert(!CB->isIndirectCall());
 
@@ -224,7 +224,7 @@ ValueRangeAnalyzer::returnFromCall(llvm::Instruction *I) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void
-ValueRangeAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
+VRAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
   const CallBase* CB = cast<CallBase>(I);
   LLVM_DEBUG(Logger->logInstruction(I));
 
@@ -263,7 +263,7 @@ ValueRangeAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
 }
 
 void
-ValueRangeAnalyzer::handleMemCpyIntrinsics(const llvm::Instruction* memcpy) {
+VRAnalyzer::handleMemCpyIntrinsics(const llvm::Instruction* memcpy) {
   assert(isa<CallInst>(memcpy) || isa<InvokeInst>(memcpy));
   LLVM_DEBUG(Logger->logInfo("llvm.memcpy"));
   const BitCastInst* dest_bitcast =
@@ -283,7 +283,7 @@ ValueRangeAnalyzer::handleMemCpyIntrinsics(const llvm::Instruction* memcpy) {
 }
 
 void
-ValueRangeAnalyzer::handleReturn(const llvm::Instruction* ret) {
+VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
   const llvm::ReturnInst* ret_i = cast<llvm::ReturnInst>(ret);
   LLVM_DEBUG(Logger->logInstruction(ret));
   const llvm::Value* ret_val = ret_i->getReturnValue();
@@ -296,7 +296,7 @@ ValueRangeAnalyzer::handleReturn(const llvm::Instruction* ret) {
 }
 
 void
-ValueRangeAnalyzer::handleStoreInstr(const llvm::Instruction* store) {
+VRAnalyzer::handleStoreInstr(const llvm::Instruction* store) {
   const llvm::StoreInst* store_i = cast<llvm::StoreInst>(store);
   LLVM_DEBUG(Logger->logInstruction(store));
   const llvm::Value* address_param = store_i->getPointerOperand();
@@ -325,7 +325,7 @@ ValueRangeAnalyzer::handleStoreInstr(const llvm::Instruction* store) {
 }
 
 generic_range_ptr_t
-ValueRangeAnalyzer::handleLoadInstr(llvm::Instruction* load) {
+VRAnalyzer::handleLoadInstr(llvm::Instruction* load) {
   llvm::LoadInst* load_i = cast<llvm::LoadInst>(load);
   LLVM_DEBUG(Logger->logInstruction(load));
 
@@ -353,7 +353,7 @@ ValueRangeAnalyzer::handleLoadInstr(llvm::Instruction* load) {
 }
 
 generic_range_ptr_t
-ValueRangeAnalyzer::handleGEPInstr(const llvm::Instruction* gep) {
+VRAnalyzer::handleGEPInstr(const llvm::Instruction* gep) {
   const llvm::GetElementPtrInst* gep_i = dyn_cast<llvm::GetElementPtrInst>(gep);
   LLVM_DEBUG(Logger->logInstruction(gep_i));
 
@@ -377,7 +377,7 @@ ValueRangeAnalyzer::handleGEPInstr(const llvm::Instruction* gep) {
 }
 
 bool
-ValueRangeAnalyzer::isDescendant(const llvm::Value* parent,
+VRAnalyzer::isDescendant(const llvm::Value* parent,
                                  const llvm::Value* desc) const {
   if (!(parent && desc)) return false;
   if (parent == desc) return true;
@@ -391,7 +391,7 @@ ValueRangeAnalyzer::isDescendant(const llvm::Value* parent,
 }
 
 range_ptr_t
-ValueRangeAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
+VRAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
   const llvm::CmpInst* cmp_i = cast<llvm::CmpInst>(cmp);
   LLVM_DEBUG(Logger->logInstruction(cmp));
   const llvm::CmpInst::Predicate pred = cmp_i->getPredicate();
@@ -407,7 +407,7 @@ ValueRangeAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
 }
 
 generic_range_ptr_t
-ValueRangeAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
+VRAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
   const llvm::PHINode* phi_n = cast<llvm::PHINode>(phi);
   if (phi_n->getNumIncomingValues() < 1) {
     return nullptr;
@@ -425,7 +425,7 @@ ValueRangeAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
 }
 
 generic_range_ptr_t
-ValueRangeAnalyzer::handleSelect(const llvm::Instruction* i) {
+VRAnalyzer::handleSelect(const llvm::Instruction* i) {
   const llvm::SelectInst* sel = cast<llvm::SelectInst>(i);
   LLVM_DEBUG(Logger->logInstruction(sel));
   // TODO: actually handle comparison.
@@ -441,7 +441,7 @@ ValueRangeAnalyzer::handleSelect(const llvm::Instruction* i) {
 ////////////////////////////////////////////////////////////////////////////////
 
 const generic_range_ptr_t
-ValueRangeAnalyzer::fetchInfo(const llvm::Value* v,
+VRAnalyzer::fetchInfo(const llvm::Value* v,
                               bool derived_or_final) {
   generic_range_ptr_t input_range = getGlobalStore()->getUserInput(v);
   if (input_range && (!derived_or_final || input_range->isFinal())) {
@@ -461,7 +461,7 @@ ValueRangeAnalyzer::fetchInfo(const llvm::Value* v,
 }
 
 range_node_ptr_t
-ValueRangeAnalyzer::getNode(const llvm::Value* v) const {
+VRAnalyzer::getNode(const llvm::Value* v) const {
   range_node_ptr_t LocalNode = VRAStore::getNode(v);
   if (LocalNode)
     return LocalNode;
@@ -474,7 +474,7 @@ ValueRangeAnalyzer::getNode(const llvm::Value* v) const {
 }
 
 range_node_ptr_t
-ValueRangeAnalyzer::getOrCreateNode(const llvm::Value* v) {
+VRAnalyzer::getOrCreateNode(const llvm::Value* v) {
   range_node_ptr_t Node = VRAStore::getOrCreateNode(v);
   if (Node) {
     return Node;
@@ -489,7 +489,7 @@ ValueRangeAnalyzer::getOrCreateNode(const llvm::Value* v) {
 }
 
 void
-ValueRangeAnalyzer::setNode(const llvm::Value* V, range_node_ptr_t Node) {
+VRAnalyzer::setNode(const llvm::Value* V, range_node_ptr_t Node) {
   if (isa<GlobalVariable>(V) || isa<Argument>(V)) {
       // set node in global analyzer
       return getGlobalStore()->setNode(V, Node);
@@ -498,7 +498,7 @@ ValueRangeAnalyzer::setNode(const llvm::Value* V, range_node_ptr_t Node) {
 }
 
 void
-ValueRangeAnalyzer::logRangeln(const llvm::Value* v) {
+VRAnalyzer::logRangeln(const llvm::Value* v) {
   LLVM_DEBUG(if (getGlobalStore()->getUserInput(v)) dbgs() << "(from metadata) ");
   LLVM_DEBUG(Logger->logRangeln(fetchInfo(v)));
 }

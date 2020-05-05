@@ -13,8 +13,8 @@ add_llvm_library(TaffoVRA MODULE
   CodeInterpreter.hpp
   VRAStore.cpp
   VRAStore.hpp
-  ValueRangeAnalyzer.cpp
-  ValueRangeAnalyzer.hpp
+  VRAnalyzer.cpp
+  VRAnalyzer.hpp
   VRAGlobalStore.cpp
   VRAGlobalStore.hpp
   VRALogger.hpp
