@@ -63,11 +63,12 @@ private:
   }
 
   std::shared_ptr<VRAStore> getAnalysisStoreForValue(const llvm::Value *V) const {
-    std::shared_ptr<AnalysisStore> AStore = CodeInt.getAnalyzerForValue(V);
+    std::shared_ptr<AnalysisStore> AStore = CodeInt.getStoreForValue(V);
     if (!AStore) {
       return nullptr;
     }
 
+    // Since llvm::dyn_cast<T>() does not do cross-casting, we must do this:
     if (std::shared_ptr<VRAnalyzer> VRA =
         std::dynamic_ptr_cast<VRAnalyzer>(AStore)) {
       return std::static_ptr_cast<VRAStore>(VRA);

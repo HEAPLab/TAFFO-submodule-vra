@@ -75,8 +75,7 @@ public:
       Pass(P), LoopInfo(nullptr), LoopTripCount(), RecursionCount() {}
 
   void interpretFunction(llvm::Function *F);
-  // TODO change to getAnalysisStoreForValue
-  std::shared_ptr<AnalysisStore> getAnalyzerForValue(const llvm::Value *V) const;
+  std::shared_ptr<AnalysisStore> getStoreForValue(const llvm::Value *V) const;
 
   std::shared_ptr<AnalysisStore> getGlobalStore() const {
     return GlobalStore;

@@ -59,7 +59,7 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
                   GlobalStore->getLogger()->logEndFunction(F));
 }
 
-std::shared_ptr<AnalysisStore> CodeInterpreter::getAnalyzerForValue(const llvm::Value *V) const {
+std::shared_ptr<AnalysisStore> CodeInterpreter::getStoreForValue(const llvm::Value *V) const {
   // TODO add assert(v) here and see what happens
   if (!V) return nullptr;
 

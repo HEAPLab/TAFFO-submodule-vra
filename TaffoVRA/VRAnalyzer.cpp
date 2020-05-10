@@ -11,6 +11,7 @@ using namespace taffo;
 
 void
 VRAnalyzer::convexMerge(const AnalysisStore &Other) {
+  // Since llvm::dyn_cast<T>() does not do cross-casting, we must do this:
   if (isa<VRAnalyzer>(Other)) {
     VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAnalyzer>(Other)));
   } else {
