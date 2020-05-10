@@ -12,6 +12,12 @@ llvm::cl::opt<bool> PropagateAll("propagate-all",
 				 llvm::cl::desc("Propagate ranges for all functions, "
 						"not only those marked as starting point."),
 				 llvm::cl::init(false));
+llvm::cl::opt<bool> Unroll("unroll",
+                           llvm::cl::desc("Default loop unroll count. "
+                                          "Setting this to 0 disables loop unrolling. "
+                                          "(Default: 1)"),
+                           llvm::cl::value_desc("count"),
+                           llvm::cl::init(1U));
 
 struct ValueRangeAnalysis : public llvm::ModulePass {
   static char ID;

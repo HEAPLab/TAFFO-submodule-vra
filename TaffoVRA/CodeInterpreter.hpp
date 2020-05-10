@@ -70,9 +70,11 @@ protected:
 
 class CodeInterpreter {
 public:
-  CodeInterpreter(llvm::Pass &P, std::shared_ptr<AnalysisStore> GlobalStore)
+  CodeInterpreter(llvm::Pass &P, std::shared_ptr<AnalysisStore> GlobalStore,
+                  unsigned LoopUnrollCount = 1U)
     : GlobalStore(GlobalStore), BBAnalyzers(), EvalCount(),
-      Pass(P), LoopInfo(nullptr), LoopTripCount(), RecursionCount() {}
+      Pass(P), LoopInfo(nullptr), LoopTripCount(), RecursionCount(),
+      DefaultTripCount(LoopUnrollCount) {}
 
   void interpretFunction(llvm::Function *F);
   std::shared_ptr<AnalysisStore> getStoreForValue(const llvm::Value *V) const;
@@ -95,6 +97,7 @@ protected:
   llvm::LoopInfo *LoopInfo;
   llvm::DenseMap<llvm::BasicBlock *, unsigned> LoopTripCount;
   llvm::DenseMap<llvm::Function *, unsigned> RecursionCount;
+  unsigned DefaultTripCount;
 
 private:
   bool isLoopBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;

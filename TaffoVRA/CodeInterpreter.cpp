@@ -186,18 +186,24 @@ void CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
   llvm::ScalarEvolution *SE = nullptr;
   for (llvm::Loop *L : LoopInfo->getLoopsInPreorder()) {
     if (llvm::BasicBlock *Latch = L->getLoopLatch()) {
-      unsigned TripCount = 0U;
-      // Get user supplied unroll count
-      llvm::Optional<unsigned> OUC = mdutils::MetadataManager::retrieveLoopUnrollCount(*L, LoopInfo);
-      if (OUC.hasValue()) {
-	TripCount = OUC.getValue();
+      if (DefaultTripCount > 0U) {
+        unsigned TripCount = 0U;
+        // Get user supplied unroll count
+        llvm::Optional<unsigned> OUC =
+          mdutils::MetadataManager::retrieveLoopUnrollCount(*L, LoopInfo);
+        if (OUC.hasValue()) {
+          TripCount = OUC.getValue();
+        } else {
+          // Compute loop trip count
+          if (!SE)
+            SE = &Pass.getAnalysis<llvm::ScalarEvolutionWrapperPass>(*F).getSE();
+          TripCount = SE->getSmallConstantTripCount(L);
+        }
+        LoopTripCount[Latch] = (TripCount > 0U) ? TripCount : DefaultTripCount;
       } else {
-	// Compute loop trip count
-	if (!SE)
-	  SE = &Pass.getAnalysis<llvm::ScalarEvolutionWrapperPass>(*F).getSE();
-	TripCount = SE->getSmallConstantTripCount(L);
+        // Loop unrolling disabled
+        LoopTripCount[Latch] = 1U;
       }
-      LoopTripCount[Latch] = (TripCount > 0U) ? TripCount : 1U;
     }
   }
 }
