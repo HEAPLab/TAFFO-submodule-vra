@@ -441,23 +441,25 @@ VRAnalyzer::handleSelect(const llvm::Instruction* i) {
 ////////////////////////////////////////////////////////////////////////////////
 
 const generic_range_ptr_t
-VRAnalyzer::fetchInfo(const llvm::Value* v,
-                              bool derived_or_final) {
-  generic_range_ptr_t input_range = getGlobalStore()->getUserInput(v);
-  if (input_range && (!derived_or_final || input_range->isFinal())) {
-    return input_range;
+VRAnalyzer::fetchInfo(const llvm::Value* V) {
+  const generic_range_ptr_t Derived = VRAStore::fetchInfo(V);
+  if (Derived) {
+    if (std::isa_ptr<VRA_Structured_Range>(Derived)
+        && V->getType()->isPointerTy()) {
+      if (generic_range_ptr_t InputRange = getGlobalStore()->getUserInput(V)) {
+        // fill null input_range fields with corresponding derived fields
+        return fillRangeHoles(Derived, InputRange);
+      }
+    }
+    return Derived;
   }
 
-  const generic_range_ptr_t Derived = VRAStore::fetchInfo(v);
-  if (input_range
-      && Derived
-      && std::isa_ptr<VRA_Structured_Range>(Derived)
-      && v->getType()->isPointerTy()) {
-    // fill null input_range fields with corresponding derived fields
-    return fillRangeHoles(Derived, input_range);
+  const generic_range_ptr_t InputRange = getGlobalStore()->getUserInput(V);
+  if (InputRange) {
+    // Save it in this store, so we don't overwrite it if it's final.
+    saveValueInfo(V, InputRange);
   }
-
-  return Derived;
+  return InputRange;
 }
 
 range_node_ptr_t

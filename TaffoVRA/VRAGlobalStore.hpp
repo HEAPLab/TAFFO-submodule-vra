@@ -38,7 +38,7 @@ public:
   static void setConstRangeMetadata(mdutils::MetadataManager &MDManager,
                                     llvm::Instruction &i);
 
-  const generic_range_ptr_t fetchInfo(const llvm::Value* v, bool derived_or_final = false) override;
+  const generic_range_ptr_t fetchInfo(const llvm::Value* v) override;
   range_node_ptr_t getOrCreateNode(const llvm::Value* v) override;
   void setNode(const llvm::Value* V, range_node_ptr_t Node);
   generic_range_ptr_t getUserInput(const llvm::Value *V) const;

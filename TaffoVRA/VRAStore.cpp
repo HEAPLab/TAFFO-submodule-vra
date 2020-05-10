@@ -18,7 +18,7 @@ VRAStore::convexMerge(const VRAStore &Other) {
     const llvm::Value *V = OValueRangeNode.first;
     range_node_ptr_t ThisNode = this->getNode(V);
     if (ThisNode) {
-      this->saveValueInfo(V, fetchInfo(V, true));
+      this->saveValueInfo(V, fetchInfo(V));
     } else {
       DerivedRanges[V] = OValueRangeNode.second;
     }
@@ -26,7 +26,7 @@ VRAStore::convexMerge(const VRAStore &Other) {
 }
 
 const generic_range_ptr_t
-VRAStore::fetchInfo(const llvm::Value* v, bool) {
+VRAStore::fetchInfo(const llvm::Value* v) {
   if (const auto node = getNode(v)) {
     if (node->isScalar()) {
       return node->getRange();

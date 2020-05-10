@@ -189,7 +189,7 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
   using namespace mdutils;
   MetadataManager &MDManager = MetadataManager::getMetadataManager();
   for (GlobalVariable &v : M.globals()) {
-    const generic_range_ptr_t range = fetchInfo(&v, true);
+    const generic_range_ptr_t range = fetchInfo(&v);
     if (range != nullptr) {
       // retrieve info about global var v, if any
       if (MDInfo *mdi = MDManager.retrieveMDInfo(&v)) {
@@ -214,7 +214,7 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
       newII.reserve(f.arg_size());
       auto argsIt = argsII.begin();
       for (Argument &arg : f.args()) {
-        const generic_range_ptr_t range = fetchInfo(&arg, true);
+        const generic_range_ptr_t range = fetchInfo(&arg);
         if (range != nullptr) {
           if (argsIt != argsII.end() && *argsIt != nullptr) {
             std::shared_ptr<MDInfo> cpymdi((*argsIt)->clone());
@@ -239,7 +239,7 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
         if (isa<StoreInst>(i))
           continue;
         refreshRange(&i);
-        const generic_range_ptr_t range = fetchInfo(&i, true);
+        const generic_range_ptr_t range = fetchInfo(&i);
         if (range != nullptr) {
           MDInfo *mdi = MDManager.retrieveMDInfo(&i);
           if (mdi != nullptr) {
@@ -352,23 +352,20 @@ VRAGlobalStore::setConstRangeMetadata(mdutils::MetadataManager &MDManager,
 
 
 const generic_range_ptr_t
-VRAGlobalStore::fetchInfo(const llvm::Value* v,
-                          bool derived_or_final) {
-  generic_range_ptr_t input_range = getUserInput(v);
-  if (input_range && (!derived_or_final || input_range->isFinal())) {
-    return input_range;
+VRAGlobalStore::fetchInfo(const llvm::Value* V) {
+  const generic_range_ptr_t Derived = VRAStore::fetchInfo(V);
+  if (Derived) {
+    if (std::isa_ptr<VRA_Structured_Range>(Derived)
+        && V->getType()->isPointerTy()) {
+      if (generic_range_ptr_t InputRange = getUserInput(V)) {
+        // fill null input_range fields with corresponding derived fields
+        return fillRangeHoles(Derived, InputRange);
+      }
+    }
+    return Derived;
   }
 
-  const generic_range_ptr_t Derived = VRAStore::fetchInfo(v);
-  if (input_range
-      && Derived
-      && std::isa_ptr<VRA_Structured_Range>(Derived)
-      && v->getType()->isPointerTy()) {
-    // fill null input_range fields with corresponding derived fields
-    return fillRangeHoles(Derived, input_range);
-  }
-
-  return Derived;
+  return getUserInput(V);
 }
 
 range_node_ptr_t
