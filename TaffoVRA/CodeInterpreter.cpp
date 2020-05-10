@@ -9,7 +9,8 @@
 
 namespace taffo {
 
-void CodeInterpreter::interpretFunction(llvm::Function *F) {
+void
+CodeInterpreter::interpretFunction(llvm::Function *F) {
   DEBUG_WITH_TYPE(GlobalStore->getLogger()->getDebugType(),
                   GlobalStore->getLogger()->logStartFunction(F));
 
@@ -59,10 +60,9 @@ void CodeInterpreter::interpretFunction(llvm::Function *F) {
                   GlobalStore->getLogger()->logEndFunction(F));
 }
 
-std::shared_ptr<AnalysisStore> CodeInterpreter::getStoreForValue(const llvm::Value *V) const {
-  // TODO add assert(v) here and see what happens
-  if (!V) return nullptr;
-
+std::shared_ptr<AnalysisStore>
+CodeInterpreter::getStoreForValue(const llvm::Value *V) const {
+  assert(V && "Trying to get AnalysisStore for null value.");
   if (llvm::isa<llvm::GlobalValue>(V)
       || llvm::isa<llvm::Argument>(V)
       || llvm::isa<llvm::Function>(V))
@@ -76,12 +76,14 @@ std::shared_ptr<AnalysisStore> CodeInterpreter::getStoreForValue(const llvm::Val
   return nullptr;
 }
 
-bool CodeInterpreter::isLoopBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const {
+bool
+CodeInterpreter::isLoopBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const {
   assert(LoopInfo);
   return LoopInfo->isLoopHeader(Dst) && getLoopForBackEdge(Src, Dst);
 }
 
-llvm::Loop *CodeInterpreter::getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const {
+llvm::Loop *
+CodeInterpreter::getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const {
   assert(LoopInfo);
   llvm::Loop *L = LoopInfo->getLoopFor(Dst);
   while (L && !L->contains(Src))
@@ -90,7 +92,8 @@ llvm::Loop *CodeInterpreter::getLoopForBackEdge(llvm::BasicBlock *Src, llvm::Bas
   return L;
 }
 
-bool CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
+bool
+CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
   // Don't follow edge if Dst has unvisited predecessors.
   unsigned SrcEC = EvalCount[Src];
   for (llvm::BasicBlock *Pred : predecessors(Dst)) {
@@ -139,10 +142,11 @@ bool CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
   return true;
 }
 
-void CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAnalyzer,
-					      std::shared_ptr<CodeAnalyzer> PathLocal,
-                                              llvm::Instruction *TermInstr,
-                                              unsigned SuccIdx) {
+void
+CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAnalyzer,
+                                         std::shared_ptr<CodeAnalyzer> PathLocal,
+                                         llvm::Instruction *TermInstr,
+                                         unsigned SuccIdx) {
   llvm::BasicBlock *SuccBB = TermInstr->getSuccessor(SuccIdx);
 
   std::shared_ptr<CodeAnalyzer> SuccAnalyzer;
@@ -159,8 +163,9 @@ void CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> Curr
   CurrentAnalyzer->setPathLocalInfo(SuccAnalyzer, TermInstr, SuccIdx);
 }
 
-void CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
-                                    llvm::Instruction *I) {
+void
+CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
+                               llvm::Instruction *I) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   llvm::Function *F = CB->getCalledFunction();
   if (!F || F->empty())
@@ -176,12 +181,14 @@ void CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
   updateLoopInfo(I->getFunction());
 }
 
-void CodeInterpreter::updateLoopInfo(llvm::Function *F) {
+void
+CodeInterpreter::updateLoopInfo(llvm::Function *F) {
   assert(F);
   LoopInfo = &Pass.getAnalysis<llvm::LoopInfoWrapperPass>(*F).getLoopInfo();
 }
 
-void CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
+void
+CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
   assert(LoopInfo && F);
   llvm::ScalarEvolution *SE = nullptr;
   for (llvm::Loop *L : LoopInfo->getLoopsInPreorder()) {
@@ -208,7 +215,8 @@ void CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
   }
 }
 
-bool CodeInterpreter::updateRecursionCount(llvm::Function *F) {
+bool
+CodeInterpreter::updateRecursionCount(llvm::Function *F) {
   auto RCIt = RecursionCount.find(F);
   if (RCIt == RecursionCount.end()) {
     unsigned FromMD = mdutils::MetadataManager::retrieveMaxRecursionCount(*F);
@@ -226,7 +234,8 @@ bool CodeInterpreter::updateRecursionCount(llvm::Function *F) {
   return false;
 }
 
-void CodeInterpreter::getAnalysisUsage(llvm::AnalysisUsage &AU) {
+void
+CodeInterpreter::getAnalysisUsage(llvm::AnalysisUsage &AU) {
   AU.addRequiredTransitive<llvm::LoopInfoWrapperPass>();
   AU.addRequiredTransitive<llvm::ScalarEvolutionWrapperPass>();
 }

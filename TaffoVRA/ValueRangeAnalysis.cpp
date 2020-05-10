@@ -29,7 +29,8 @@ ValueRangeAnalysis::runOnModule(Module &M) {
   return true;
 }
 
-void ValueRangeAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
+void
+ValueRangeAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
   CodeInterpreter::getAnalysisUsage(AU);
   AU.addRequiredTransitive<MemorySSAWrapperPass>();
   AU.setPreservesAll();

@@ -49,6 +49,7 @@ VRAStore::fetchInfo(const llvm::Value* v) {
 void
 VRAStore::saveValueInfo(const llvm::Value* v,
                         const generic_range_ptr_t& info) {
+  assert(v && "Trying to save range for null value.");
   if (range_node_ptr_t node = getNode(v)) {
     if (!node->hasRange() && !node->hasParent()) {
       node->setRange(info);
@@ -72,7 +73,7 @@ VRAStore::saveValueInfo(const llvm::Value* v,
 
 range_node_ptr_t
 VRAStore::getNode(const llvm::Value* v) const {
-  // TODO add assert(v) here and see what happens
+  assert(v && "Trying to get node for null value.");
   const auto it = DerivedRanges.find(v);
   if (it != DerivedRanges.end()) {
     return it->second;
@@ -135,8 +136,11 @@ VRAStore::fetchRange(const range_node_ptr_t node,
     return nullptr;
   }
   // if this is not a range-node, lookup parent
-  offset.push_back(node->getOffset());
-  return fetchRange(getNode(node->getParent()), offset);
+  if (node->hasParent()) {
+    offset.push_back(node->getOffset());
+    return fetchRange(getNode(node->getParent()), offset);
+  }
+  return nullptr;
 }
 
 void

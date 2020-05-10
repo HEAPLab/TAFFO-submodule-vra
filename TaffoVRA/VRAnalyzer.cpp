@@ -287,13 +287,16 @@ void
 VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
   const llvm::ReturnInst* ret_i = cast<llvm::ReturnInst>(ret);
   LLVM_DEBUG(Logger->logInstruction(ret));
-  const llvm::Value* ret_val = ret_i->getReturnValue();
-  const llvm::Function* ret_fun = ret_i->getFunction();
-  generic_range_ptr_t range = fetchInfo(ret_val);
-  generic_range_ptr_t partial = getGlobalStore()->findRetVal(ret_fun);
-  generic_range_ptr_t returned = getUnionRange(partial, range);
-  getGlobalStore()->setRetVal(ret_fun, returned);
-  LLVM_DEBUG(Logger->logRangeln(returned));
+  if (const llvm::Value* ret_val = ret_i->getReturnValue()) {
+    const llvm::Function* ret_fun = ret_i->getFunction();
+    generic_range_ptr_t range = fetchInfo(ret_val);
+    generic_range_ptr_t partial = getGlobalStore()->findRetVal(ret_fun);
+    generic_range_ptr_t returned = getUnionRange(partial, range);
+    getGlobalStore()->setRetVal(ret_fun, returned);
+    LLVM_DEBUG(Logger->logRangeln(returned));
+  } else {
+    LLVM_DEBUG(Logger->logInfoln("void return."));
+  }
 }
 
 void
