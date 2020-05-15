@@ -869,6 +869,7 @@ void ValueRangeAnalysis::handleStoreInstr(const llvm::Instruction* store)
 			logError("pointer circularity!");
 		else {
 			const generic_range_ptr_t old_range = fetchInfo(address_param);
+			saveValueInfo(address_param, fetchInfo(value_param));
 			derived_ranges[address_param] =
 			  make_range_node(value_param, std::vector<unsigned>());
 			saveValueInfo(address_param, old_range);
