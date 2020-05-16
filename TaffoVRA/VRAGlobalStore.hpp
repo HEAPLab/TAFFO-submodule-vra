@@ -18,13 +18,9 @@ public:
 
   void convexMerge(const AnalysisStore &Other) override;
   std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) override;
+  std::shared_ptr<AnalysisStore> newFunctionStore(CodeInterpreter &CI) override;
+  bool hasValue(const llvm::Value *V) const override { return DerivedRanges.count(V); }
   std::shared_ptr<CILogger> getLogger() const override { return Logger; }
-
-  // Function handling stuff
-  generic_range_ptr_t findRetVal(const llvm::Function* F);
-  void setRetVal(const llvm::Function* F, generic_range_ptr_t RetVal);
-  void setArgumentRanges(const llvm::Function &F,
-                         const std::list<range_node_ptr_t> &AARanges);
 
   // Metadata Processing
   void harvestMetadata(llvm::Module &M);
@@ -40,7 +36,9 @@ public:
 
   const generic_range_ptr_t fetchInfo(const llvm::Value* v) override;
   range_node_ptr_t getOrCreateNode(const llvm::Value* v) override;
-  void setNode(const llvm::Value* V, range_node_ptr_t Node);
+  void setNode(const llvm::Value* V, range_node_ptr_t Node) override {
+    VRAStore::setNode(V, Node);
+  }
   generic_range_ptr_t getUserInput(const llvm::Value *V) const;
 
   static bool classof(const AnalysisStore *AS) {

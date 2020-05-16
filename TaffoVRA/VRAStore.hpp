@@ -21,13 +21,14 @@ public:
   virtual void saveValueInfo(const llvm::Value* v, const generic_range_ptr_t& info);
   virtual range_node_ptr_t getNode(const llvm::Value* v) const;
   virtual range_node_ptr_t getOrCreateNode(const llvm::Value* v);
+  virtual void setNode(const llvm::Value* V, range_node_ptr_t Node);
   virtual generic_range_ptr_t fetchRange(const range_node_ptr_t node,
                                          std::list<std::vector<unsigned>>& offset) const;
   virtual void setRange(range_node_ptr_t node, const generic_range_ptr_t& info,
                         std::list<std::vector<unsigned>>& offset);
   virtual generic_range_ptr_t fetchConstant(const llvm::Constant* v);
 
-  enum VRAStoreKind { VRASK_VRAGlobalStore, VRASK_VRAnalyzer };
+  enum VRAStoreKind { VRASK_VRAGlobalStore, VRASK_VRAnalyzer, VRASK_VRAFunctionStore };
   VRAStoreKind getKind() const { return Kind; }
 
 protected:

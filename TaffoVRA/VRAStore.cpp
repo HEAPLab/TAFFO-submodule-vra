@@ -109,6 +109,11 @@ VRAStore::getOrCreateNode(const llvm::Value* v) {
   return ret;
 }
 
+void
+VRAStore::setNode(const llvm::Value* V, range_node_ptr_t Node) {
+  DerivedRanges[V] = Node;
+}
+
 generic_range_ptr_t
 VRAStore::fetchRange(const range_node_ptr_t node,
                      std::list<std::vector<unsigned>>& offset) const {

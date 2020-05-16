@@ -1,5 +1,6 @@
 #include "CodeInterpreter.hpp"
 
+#include <cassert>
 #include <deque>
 #include "llvm/Support/Debug.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -10,9 +11,14 @@
 namespace taffo {
 
 void
-CodeInterpreter::interpretFunction(llvm::Function *F) {
+CodeInterpreter::interpretFunction(llvm::Function *F,
+                                   std::shared_ptr<AnalysisStore> FunctionStore) {
   DEBUG_WITH_TYPE(GlobalStore->getLogger()->getDebugType(),
                   GlobalStore->getLogger()->logStartFunction(F));
+  if (!FunctionStore) {
+    FunctionStore = GlobalStore->newFunctionStore(*this);
+  }
+  Scopes.push_back(FunctionScope(FunctionStore));
 
   updateLoopInfo(F);
   retrieveLoopTripCount(F);
@@ -20,15 +26,15 @@ CodeInterpreter::interpretFunction(llvm::Function *F) {
   llvm::BasicBlock *EntryBlock = &F->getEntryBlock();
   std::deque<llvm::BasicBlock *> Worklist;
   Worklist.push_back(EntryBlock);
-  EvalCount[EntryBlock] = 1U;
-  BBAnalyzers[EntryBlock] = GlobalStore->newCodeAnalyzer(*this);
+  Scopes.back().EvalCount[EntryBlock] = 1U;
+  Scopes.back().BBAnalyzers[EntryBlock] = GlobalStore->newCodeAnalyzer(*this);
 
   while (!Worklist.empty()) {
     llvm::BasicBlock *BB = Worklist.front();
     Worklist.pop_front();
 
-    auto CAIt = BBAnalyzers.find(BB);
-    assert(CAIt != BBAnalyzers.end());
+    auto CAIt = Scopes.back().BBAnalyzers.find(BB);
+    assert(CAIt != Scopes.back().BBAnalyzers.end());
     std::shared_ptr<CodeAnalyzer> CurAnalyzer = CAIt->second;
     std::shared_ptr<CodeAnalyzer> PathLocal = CurAnalyzer->clone();
 
@@ -41,8 +47,8 @@ CodeInterpreter::interpretFunction(llvm::Function *F) {
 	CurAnalyzer->analyzeInstruction(&I);
     }
 
-    assert(EvalCount[BB] > 0 && "Trying to evaluated block with 0 EvalCount.");
-    --EvalCount[BB];
+    assert(Scopes.back().EvalCount[BB] > 0 && "Trying to evaluate block with 0 EvalCount.");
+    --(Scopes.back().EvalCount[BB]);
 
     llvm::Instruction *Term = BB->getTerminator();
     for (unsigned NS = 0; NS < Term->getNumSuccessors(); ++NS) {
@@ -56,6 +62,9 @@ CodeInterpreter::interpretFunction(llvm::Function *F) {
     GlobalStore->convexMerge(*CurAnalyzer);
   }
 
+  GlobalStore->convexMerge(*FunctionStore);
+  Scopes.pop_back();
+
   DEBUG_WITH_TYPE(GlobalStore->getLogger()->getDebugType(),
                   GlobalStore->getLogger()->logEndFunction(F));
 }
@@ -63,16 +72,25 @@ CodeInterpreter::interpretFunction(llvm::Function *F) {
 std::shared_ptr<AnalysisStore>
 CodeInterpreter::getStoreForValue(const llvm::Value *V) const {
   assert(V && "Trying to get AnalysisStore for null value.");
-  if (llvm::isa<llvm::GlobalValue>(V)
-      || llvm::isa<llvm::Argument>(V)
-      || llvm::isa<llvm::Function>(V))
+
+  if (llvm::isa<llvm::GlobalVariable>(V))
     return GlobalStore;
 
-  if (const llvm::Instruction *I = llvm::dyn_cast<llvm::Instruction>(V)) {
-    auto BBAIt = BBAnalyzers.find(I->getParent());
-    if (BBAIt != BBAnalyzers.end())
-      return BBAIt->second;
+  if (llvm::isa<llvm::Argument>(V)) {
+    for (const FunctionScope &Scope : llvm::make_range(Scopes.rbegin(), Scopes.rend())) {
+      if (Scope.FunctionStore->hasValue(V))
+        return Scope.FunctionStore;
+    }
   }
+
+  if (const llvm::Instruction *I = llvm::dyn_cast<llvm::Instruction>(V)) {
+    for (const FunctionScope &Scope : llvm::make_range(Scopes.rbegin(), Scopes.rend())) {
+      auto BBAIt = Scope.BBAnalyzers.find(I->getParent());
+      if (BBAIt != Scope.BBAnalyzers.end() && BBAIt->second->hasValue(I))
+        return BBAIt->second;
+    }
+  }
+
   return nullptr;
 }
 
@@ -94,6 +112,7 @@ CodeInterpreter::getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst
 
 bool
 CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
+  llvm::DenseMap<llvm::BasicBlock *, unsigned> &EvalCount = Scopes.back().EvalCount;
   // Don't follow edge if Dst has unvisited predecessors.
   unsigned SrcEC = EvalCount[Src];
   for (llvm::BasicBlock *Pred : predecessors(Dst)) {
@@ -147,6 +166,8 @@ CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAn
                                          std::shared_ptr<CodeAnalyzer> PathLocal,
                                          llvm::Instruction *TermInstr,
                                          unsigned SuccIdx) {
+  llvm::DenseMap<llvm::BasicBlock *, std::shared_ptr<CodeAnalyzer>> &BBAnalyzers =
+    Scopes.back().BBAnalyzers;
   llvm::BasicBlock *SuccBB = TermInstr->getSuccessor(SuccIdx);
 
   std::shared_ptr<CodeAnalyzer> SuccAnalyzer;
@@ -171,12 +192,14 @@ CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
   if (!F || F->empty())
     return;
 
-  CurAnalyzer->prepareForCall(I);
+  if (!updateRecursionCount(F))
+    return;
 
-  if (updateRecursionCount(F))
-    interpretFunction(F);
+  std::shared_ptr<AnalysisStore> FunctionStore = GlobalStore->newFunctionStore(*this);
 
-  CurAnalyzer->returnFromCall(I);
+  CurAnalyzer->prepareForCall(I, FunctionStore);
+  interpretFunction(F, FunctionStore);
+  CurAnalyzer->returnFromCall(I, FunctionStore);
 
   updateLoopInfo(I->getFunction());
 }

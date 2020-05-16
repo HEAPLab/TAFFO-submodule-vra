@@ -3,6 +3,7 @@
 
 #include "VRAStore.hpp"
 #include "VRAGlobalStore.hpp"
+#include "VRAFunctionStore.hpp"
 #include "CodeInterpreter.hpp"
 #include "VRALogger.hpp"
 
@@ -19,14 +20,18 @@ public:
 
   void convexMerge(const AnalysisStore &Other) override;
   std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) override;
+  std::shared_ptr<AnalysisStore> newFunctionStore(CodeInterpreter &CI) override;
+  bool hasValue(const llvm::Value *V) const override { return DerivedRanges.count(V); }
   std::shared_ptr<CILogger> getLogger() const override { return Logger; }
   std::shared_ptr<CodeAnalyzer> clone() override;
   void analyzeInstruction(llvm::Instruction *I) override;
   void setPathLocalInfo(std::shared_ptr<CodeAnalyzer> SuccAnalyzer,
                         llvm::Instruction *TermInstr, unsigned SuccIdx) override;
   bool requiresInterpretation(llvm::Instruction *I) const override;
-  void prepareForCall(llvm::Instruction *I) override;
-  void returnFromCall(llvm::Instruction *I) override;
+  void prepareForCall(llvm::Instruction *I,
+                      std::shared_ptr<AnalysisStore> FunctionStore) override;
+  void returnFromCall(llvm::Instruction *I,
+                      std::shared_ptr<AnalysisStore> FunctionStore) override;
 
   static bool classof(const AnalysisStore *AS) {
     return AS->getKind() == ASK_VRAnalyzer;
@@ -55,7 +60,7 @@ private:
   const generic_range_ptr_t fetchInfo(const llvm::Value* v) override;
   range_node_ptr_t getNode(const llvm::Value* v) const override;
   range_node_ptr_t getOrCreateNode(const llvm::Value* v) override;
-  void setNode(const llvm::Value* V, range_node_ptr_t Node);
+  void setNode(const llvm::Value* V, range_node_ptr_t Node) override;
 
   // Interface with CodeInterpreter
   std::shared_ptr<VRAGlobalStore> getGlobalStore() const {
@@ -73,8 +78,11 @@ private:
         std::dynamic_ptr_cast<VRAnalyzer>(AStore)) {
       return std::static_ptr_cast<VRAStore>(VRA);
     } else if (std::shared_ptr<VRAGlobalStore> VRAGS =
-        std::dynamic_ptr_cast<VRAGlobalStore>(AStore)) {
+               std::dynamic_ptr_cast<VRAGlobalStore>(AStore)) {
       return std::static_ptr_cast<VRAStore>(VRAGS);
+    } else if (std::shared_ptr<VRAFunctionStore> VRAFS =
+               std::dynamic_ptr_cast<VRAFunctionStore>(AStore)) {
+      return std::static_ptr_cast<VRAStore>(VRAFS);
     }
     return nullptr;
   }

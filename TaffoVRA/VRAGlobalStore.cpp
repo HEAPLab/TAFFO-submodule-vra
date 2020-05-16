@@ -9,10 +9,12 @@ using namespace taffo;
 void
 VRAGlobalStore::convexMerge(const AnalysisStore &Other) {
   // Since llvm::dyn_cast<T>() does not do cross-casting, we must do this:
-  if (isa<VRAnalyzer>(Other)) {
+  if (llvm::isa<VRAnalyzer>(Other)) {
     VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAnalyzer>(Other)));
-  } else {
+  } else if (llvm::isa<VRAGlobalStore>(Other)) {
     VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAGlobalStore>(Other)));
+  } else {
+    VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAFunctionStore>(Other)));
   }
 }
 
@@ -21,35 +23,9 @@ VRAGlobalStore::newCodeAnalyzer(CodeInterpreter &CI) {
   return std::make_shared<VRAnalyzer>(CI);
 }
 
-generic_range_ptr_t
-VRAGlobalStore::findRetVal(const llvm::Function* F) {
-  auto it = ReturnValues.find(F);
-  if (it != ReturnValues.end()) {
-    return it->second;
-  }
-
-  return nullptr;
-}
-
-void
-VRAGlobalStore::setRetVal(const llvm::Function* F,
-                          generic_range_ptr_t RetVal) {
-  ReturnValues[F] = RetVal;
-}
-
-void
-VRAGlobalStore::setArgumentRanges(const llvm::Function &F,
-                                  const std::list<range_node_ptr_t> &AARanges) {
-  assert(AARanges.size() == F.arg_size()
-         && "Mismatch between number of actual and formal parameters.");
-  auto derived_info_it = AARanges.begin();
-  auto derived_info_end = AARanges.end();
-
-  for (const llvm::Argument &formal_arg : F.args()) {
-    assert(derived_info_it != derived_info_end);
-    setNode(&formal_arg, *derived_info_it);
-    ++derived_info_it;
-  }
+std::shared_ptr<AnalysisStore>
+VRAGlobalStore::newFunctionStore(CodeInterpreter &CI) {
+  return std::make_shared<VRAFunctionStore>(CI);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -384,11 +360,6 @@ VRAGlobalStore::getOrCreateNode(const llvm::Value* v) {
   }
 
   return nullptr;
-}
-
-void
-VRAGlobalStore::setNode(const llvm::Value* V, range_node_ptr_t Node) {
-  DerivedRanges[V] = Node;
 }
 
 generic_range_ptr_t

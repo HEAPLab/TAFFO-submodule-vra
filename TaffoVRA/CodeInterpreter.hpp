@@ -2,7 +2,6 @@
 #define TAFFO_CODE_SCHEDULER_HPP
 
 #include <memory>
-#include <cassert>
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Pass.h"
@@ -37,9 +36,11 @@ class AnalysisStore {
 public:
   virtual void convexMerge(const AnalysisStore &Other) = 0;
   virtual std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) = 0;
+  virtual std::shared_ptr<AnalysisStore> newFunctionStore(CodeInterpreter &CI) = 0;
+  virtual bool hasValue(const llvm::Value *V) const = 0;
   virtual std::shared_ptr<CILogger> getLogger() const = 0;
 
-  enum AnalysisStoreKind { ASK_VRAGlobalStore, ASK_VRAnalyzer };
+  enum AnalysisStoreKind { ASK_VRAGlobalStore, ASK_VRAnalyzer, ASK_VRAFunctionStore };
   AnalysisStoreKind getKind() const { return Kind; }
 
 protected:
@@ -56,8 +57,10 @@ public:
   virtual void setPathLocalInfo(std::shared_ptr<CodeAnalyzer> SuccAnalyzer,
                                 llvm::Instruction *TermInstr, unsigned SuccIdx) = 0;
   virtual bool requiresInterpretation(llvm::Instruction *I) const = 0;
-  virtual void prepareForCall(llvm::Instruction *I) = 0;
-  virtual void returnFromCall(llvm::Instruction *I) = 0;
+  virtual void prepareForCall(llvm::Instruction *I,
+                              std::shared_ptr<AnalysisStore> FunctionStore) = 0;
+  virtual void returnFromCall(llvm::Instruction *I,
+                              std::shared_ptr<AnalysisStore> FunctionStore) = 0;
 
   static bool classof(const AnalysisStore *AS) {
     return AS->getKind() >= ASK_VRAGlobalStore
@@ -68,19 +71,32 @@ protected:
   CodeAnalyzer(AnalysisStoreKind K) : AnalysisStore(K) {}
 };
 
+struct FunctionScope {
+  FunctionScope(std::shared_ptr<AnalysisStore> FS)
+    : FunctionStore(FS), BBAnalyzers(), EvalCount() {}
+
+  std::shared_ptr<AnalysisStore> FunctionStore;
+  llvm::DenseMap<llvm::BasicBlock *, std::shared_ptr<CodeAnalyzer>> BBAnalyzers;
+  llvm::DenseMap<llvm::BasicBlock *, unsigned> EvalCount;
+};
+
 class CodeInterpreter {
 public:
   CodeInterpreter(llvm::Pass &P, std::shared_ptr<AnalysisStore> GlobalStore,
                   unsigned LoopUnrollCount = 1U)
-    : GlobalStore(GlobalStore), BBAnalyzers(), EvalCount(),
+    : GlobalStore(GlobalStore), Scopes(),
       Pass(P), LoopInfo(nullptr), LoopTripCount(), RecursionCount(),
       DefaultTripCount(LoopUnrollCount) {}
 
-  void interpretFunction(llvm::Function *F);
+  void interpretFunction(llvm::Function *F,
+                         std::shared_ptr<AnalysisStore> FunctionStore = nullptr);
   std::shared_ptr<AnalysisStore> getStoreForValue(const llvm::Value *V) const;
 
   std::shared_ptr<AnalysisStore> getGlobalStore() const {
     return GlobalStore;
+  }
+  std::shared_ptr<AnalysisStore> getFunctionStore() const {
+    return Scopes.back().FunctionStore;
   }
 
   llvm::Pass& getPass() const {
@@ -91,8 +107,7 @@ public:
 
 protected:
   std::shared_ptr<AnalysisStore> GlobalStore;
-  llvm::DenseMap<llvm::BasicBlock *, std::shared_ptr<CodeAnalyzer>> BBAnalyzers;
-  llvm::DenseMap<llvm::BasicBlock *, unsigned> EvalCount;
+  llvm::SmallVector<FunctionScope, 4U> Scopes;
   llvm::Pass &Pass;
   llvm::LoopInfo *LoopInfo;
   llvm::DenseMap<llvm::BasicBlock *, unsigned> LoopTripCount;

@@ -12,16 +12,23 @@ using namespace taffo;
 void
 VRAnalyzer::convexMerge(const AnalysisStore &Other) {
   // Since llvm::dyn_cast<T>() does not do cross-casting, we must do this:
-  if (isa<VRAnalyzer>(Other)) {
+  if (llvm::isa<VRAnalyzer>(Other)) {
     VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAnalyzer>(Other)));
-  } else {
+  } else if (llvm::isa<VRAGlobalStore>(Other)) {
     VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAGlobalStore>(Other)));
+  } else {
+    VRAStore::convexMerge(llvm::cast<VRAStore>(llvm::cast<VRAFunctionStore>(Other)));
   }
 }
 
 std::shared_ptr<CodeAnalyzer>
 VRAnalyzer::newCodeAnalyzer(CodeInterpreter &CI) {
   return std::make_shared<VRAnalyzer>(CI);
+}
+
+std::shared_ptr<AnalysisStore>
+VRAnalyzer::newFunctionStore(CodeInterpreter &CI) {
+  return std::make_shared<VRAFunctionStore>(CI);
 }
 
 std::shared_ptr<CodeAnalyzer>
@@ -181,7 +188,8 @@ VRAnalyzer::requiresInterpretation(llvm::Instruction *I) const {
 }
 
 void
-VRAnalyzer::prepareForCall(llvm::Instruction *I) {
+VRAnalyzer::prepareForCall(llvm::Instruction *I,
+                           std::shared_ptr<AnalysisStore> FunctionStore) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   assert(!CB->isIndirectCall());
 
@@ -200,17 +208,22 @@ VRAnalyzer::prepareForCall(llvm::Instruction *I) {
   }
   LLVM_DEBUG(llvm::dbgs() << "\n");
 
-  getGlobalStore()->setArgumentRanges(*CB->getCalledFunction(), ArgRanges);
+  std::shared_ptr<VRAFunctionStore> FStore =
+    std::static_ptr_cast<VRAFunctionStore>(FunctionStore);
+  FStore->setArgumentRanges(*CB->getCalledFunction(), ArgRanges);
 }
 
 void
-VRAnalyzer::returnFromCall(llvm::Instruction *I) {
+VRAnalyzer::returnFromCall(llvm::Instruction *I,
+                           std::shared_ptr<AnalysisStore> FunctionStore) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   assert(!CB->isIndirectCall());
 
   LLVM_DEBUG(Logger->logInstruction(I); Logger->logInfo("returning from call"));
 
-  generic_range_ptr_t Ret = getGlobalStore()->findRetVal(CB->getCalledFunction());
+  std::shared_ptr<VRAFunctionStore> FStore =
+    std::static_ptr_cast<VRAFunctionStore>(FunctionStore);
+  generic_range_ptr_t Ret = FStore->getRetVal();
   if (Ret) {
     saveValueInfo(I, Ret);
     LLVM_DEBUG(logRangeln(I));
@@ -290,10 +303,12 @@ VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
   if (const llvm::Value* ret_val = ret_i->getReturnValue()) {
     const llvm::Function* ret_fun = ret_i->getFunction();
     generic_range_ptr_t range = fetchInfo(ret_val);
-    generic_range_ptr_t partial = getGlobalStore()->findRetVal(ret_fun);
-    generic_range_ptr_t returned = getUnionRange(partial, range);
-    getGlobalStore()->setRetVal(ret_fun, returned);
-    LLVM_DEBUG(Logger->logRangeln(returned));
+
+    std::shared_ptr<VRAFunctionStore> FStore =
+      std::static_ptr_cast<VRAFunctionStore>(CodeInt.getFunctionStore());
+    FStore->setRetVal(range);
+
+    LLVM_DEBUG(Logger->logRangeln(range));
   } else {
     LLVM_DEBUG(Logger->logInfoln("void return."));
   }
@@ -496,10 +511,18 @@ VRAnalyzer::getOrCreateNode(const llvm::Value* v) {
 
 void
 VRAnalyzer::setNode(const llvm::Value* V, range_node_ptr_t Node) {
-  if (isa<GlobalVariable>(V) || isa<Argument>(V)) {
+  if (isa<GlobalVariable>(V)) {
       // set node in global analyzer
-      return getGlobalStore()->setNode(V, Node);
+      getGlobalStore()->setNode(V, Node);
+      return;
   }
+  if (isa<Argument>(V)) {
+    std::shared_ptr<VRAFunctionStore> FStore =
+      std::static_ptr_cast<VRAFunctionStore>(CodeInt.getFunctionStore());
+    FStore->setNode(V, Node);
+    return;
+  }
+
   DerivedRanges[V] = Node;
 }
 

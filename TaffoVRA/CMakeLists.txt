@@ -17,6 +17,8 @@ add_llvm_library(TaffoVRA MODULE
   VRAnalyzer.hpp
   VRAGlobalStore.cpp
   VRAGlobalStore.hpp
+  VRAFunctionStore.cpp
+  VRAFunctionStore.hpp
   VRALogger.hpp
 
   PLUGIN_TOOL
