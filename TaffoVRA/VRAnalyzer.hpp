@@ -47,20 +47,22 @@ private:
   void handleMemCpyIntrinsics(const llvm::Instruction* memcpy);
   void handleReturn(const llvm::Instruction* ret);
 
+  void handleAllocaInstr(const llvm::Instruction *I);
   void handleStoreInstr(const llvm::Instruction* store);
-  generic_range_ptr_t handleLoadInstr(llvm::Instruction* load);
-  generic_range_ptr_t handleGEPInstr(const llvm::Instruction* gep);
-  bool isDescendant(const llvm::Value* parent, const llvm::Value* desc) const;
+  void handleLoadInstr(llvm::Instruction* load);
+  void handleGEPInstr(const llvm::Instruction* gep);
+  //bool isDescendant(const llvm::Value* parent, const llvm::Value* desc) const;
 
-  range_ptr_t handleCmpInstr(const llvm::Instruction* cmp);
-  generic_range_ptr_t handlePhiNode(const llvm::Instruction* phi);
-  generic_range_ptr_t handleSelect(const llvm::Instruction* i);
+  void handleCmpInstr(const llvm::Instruction* cmp);
+  void handlePhiNode(const llvm::Instruction* phi);
+  void handleSelect(const llvm::Instruction* i);
 
   // Data handling
-  const generic_range_ptr_t fetchInfo(const llvm::Value* v) override;
-  range_node_ptr_t getNode(const llvm::Value* v) const override;
-  range_node_ptr_t getOrCreateNode(const llvm::Value* v) override;
-  void setNode(const llvm::Value* V, range_node_ptr_t Node) override;
+  using VRAStore::fetchRange;
+  const range_ptr_t fetchRange(const llvm::Value *V) override;
+  const RangeNodePtrT fetchRangeNode(const llvm::Value* V) override;
+  NodePtrT getNode(const llvm::Value* v) override;
+  void setNode(const llvm::Value* V, NodePtrT Node) override;
 
   // Interface with CodeInterpreter
   std::shared_ptr<VRAGlobalStore> getGlobalStore() const {

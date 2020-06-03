@@ -72,11 +72,10 @@ taffo::handleUnaryInstruction(const range_ptr_t &op,
 }
 
 /** Cast instructions */
-generic_range_ptr_t
-taffo::handleCastInstruction(const generic_range_ptr_t &op,
+range_ptr_t
+taffo::handleCastInstruction(const range_ptr_t scalar,
                              const unsigned OpCode,
                              const llvm::Type *dest) {
-  const range_ptr_t scalar = std::dynamic_ptr_cast_or_null<range_t>(op);
   switch (OpCode) {
     case llvm::Instruction::Trunc:
       return handleTrunc(scalar, dest);
@@ -135,8 +134,8 @@ taffo::handleMathCallInstruction(const std::list<range_ptr_t>& ops,
 }
 
 /** Handle call to known math functions. Return nullptr if unknown */
-generic_range_ptr_t
-taffo::handleCompare(const std::list<generic_range_ptr_t>& ops,
+range_ptr_t
+taffo::handleCompare(const std::list<range_ptr_t>& ops,
                      const llvm::CmpInst::Predicate pred) {
   switch (pred) {
     case llvm::CmpInst::Predicate::FCMP_FALSE:
@@ -152,8 +151,8 @@ taffo::handleCompare(const std::list<generic_range_ptr_t>& ops,
   assert(ops.size() <= 2 && "too many operators in compare instruction");
 
   // extract values for easy access
-  range_ptr_t lhs = std::dynamic_ptr_cast_or_null<range_t>(ops.front());
-  range_ptr_t rhs = std::dynamic_ptr_cast_or_null<range_t>(ops.back());
+  range_ptr_t lhs = ops.front();
+  range_ptr_t rhs = ops.back();
   // if unavailable data, nothing can be said
   if (!lhs || !rhs) {
     return getGenericBoolRange();
@@ -484,16 +483,33 @@ taffo::handleBooleanOr(const range_ptr_t &op1,
 }
 
 /** deep copy of range */
-generic_range_ptr_t
-taffo::copyRange(const generic_range_ptr_t &op) {
-  if (!op) {
+RangeNodePtrT
+taffo::copyRange(const RangeNodePtrT op) {
+  if (!op)
     return nullptr;
+
+  if (const std::shared_ptr<VRAScalarNode> op_s =
+      std::static_ptr_cast<VRAScalarNode>(op)) {
+    return std::make_shared<VRAScalarNode>(copyRange(op_s->getRange()));
   }
-  return op->clone();
+
+  const std::shared_ptr<VRAStructNode> op_s = std::static_ptr_cast<VRAStructNode>(op);
+  llvm::SmallVector<NodePtrT, 4U> new_fields;
+  unsigned num_fields = op_s->getNumFields();
+  new_fields.reserve(num_fields);
+  for (unsigned i = 0; i < num_fields; ++i) {
+    if (const std::shared_ptr<VRAPtrNode> ptr_field =
+        std::dynamic_ptr_cast_or_null<VRAPtrNode>(op_s->getNodeAt(i))) {
+      new_fields.push_back(std::make_shared<VRAPtrNode>(ptr_field->getParent()));
+    } else {
+      new_fields.push_back(copyRange(std::static_ptr_cast<VRARangeNode>(op_s->getNodeAt(i))));
+    }
+  }
+  return std::make_shared<VRAStructNode>(new_fields);
 }
 
 range_ptr_t
-taffo::copyRange(const range_ptr_t &op) {
+taffo::copyRange(const range_ptr_t op) {
   if (!op) {
     return nullptr;
   }
@@ -535,43 +551,56 @@ taffo::getUnionRange(const range_ptr_t &op1, const range_ptr_t &op2) {
   return make_range(min, max);
 }
 
-generic_range_ptr_t
-taffo::getUnionRange(const generic_range_ptr_t &op1,
-                     const generic_range_ptr_t &op2) {
+RangeNodePtrT
+taffo::getUnionRange(const RangeNodePtrT op1,
+                     const RangeNodePtrT op2) {
   if (!op1) return copyRange(op2);
   if (!op2) return copyRange(op1);
 
-  if (const range_ptr_t sop1 = std::dynamic_ptr_cast_or_null<range_t>(op1)) {
-    const range_ptr_t sop2 = std::dynamic_ptr_cast_or_null<range_t>(op2);
-    return getUnionRange(sop1, sop2);
+  if (const std::shared_ptr<VRAScalarNode> sop1 =
+      std::dynamic_ptr_cast<VRAScalarNode>(op1)) {
+    const std::shared_ptr<VRAScalarNode> sop2 =
+      std::static_ptr_cast<VRAScalarNode>(op2);
+    return std::make_shared<VRAScalarNode>(getUnionRange(sop1->getRange(), sop2->getRange()));
   }
 
-  const range_s_ptr_t op1_s = std::static_ptr_cast<range_s_t>(op1);
-  const range_s_ptr_t op2_s = std::static_ptr_cast<range_s_t>(op2);
-  unsigned num_fields = std::max(op1_s->getNumRanges(), op2_s->getNumRanges());
-  std::vector<generic_range_ptr_t> new_fields;
+  const std::shared_ptr<VRAStructNode> op1_s = std::static_ptr_cast<VRAStructNode>(op1);
+  const std::shared_ptr<VRAStructNode> op2_s = std::static_ptr_cast<VRAStructNode>(op2);
+  unsigned num_fields = std::max(op1_s->getNumFields(), op2_s->getNumFields());
+  llvm::SmallVector<NodePtrT, 4U> new_fields;
   new_fields.reserve(num_fields);
   for (unsigned i = 0; i < num_fields; ++i) {
-    new_fields.push_back(getUnionRange(op1_s->getRangeAt(i), op2_s->getRangeAt(i)));
+    const NodePtrT op1_f = op1_s->getNodeAt(i);
+    if (op1_f && std::isa_ptr<VRAPtrNode>(op1_f)) {
+      new_fields.push_back(op1_f);
+    } else {
+      new_fields.push_back(getUnionRange(std::static_ptr_cast<VRARangeNode>(op1_f),
+                                         std::static_ptr_cast<VRARangeNode>(op2_s->getNodeAt(i))));
+    }
   }
-  return make_s_range(new_fields);
+  return std::make_shared<VRAStructNode>(new_fields);
 }
 
-generic_range_ptr_t
-taffo::fillRangeHoles(const generic_range_ptr_t &src,
-                      const generic_range_ptr_t &dst) {
+RangeNodePtrT
+taffo::fillRangeHoles(const RangeNodePtrT src,
+                      const RangeNodePtrT dst) {
   if (!src) return copyRange(dst);
-  if (!dst || std::isa_ptr<range_t>(src)) {
+  if (!dst || std::isa_ptr<VRAScalarNode>(src)) {
     return copyRange(src);
   }
-  const range_s_ptr_t src_s = std::static_ptr_cast<range_s_t>(src);
-  const range_s_ptr_t dst_s = std::static_ptr_cast<range_s_t>(dst);
-  std::vector<generic_range_ptr_t> new_fields;
-  new_fields.reserve(src_s->getNumRanges());
-  for (unsigned i = 0; i < src_s->getNumRanges(); ++i) {
-    if (i < dst_s->getNumRanges())
-      new_fields.push_back(fillRangeHoles(src_s->getRangeAt(i),
-                                          dst_s->getRangeAt(i)));
+  const std::shared_ptr<VRAStructNode> src_s = std::static_ptr_cast<VRAStructNode>(src);
+  const std::shared_ptr<VRAStructNode> dst_s = std::static_ptr_cast<VRAStructNode>(dst);
+  llvm::SmallVector<NodePtrT, 4U> new_fields;
+  unsigned num_fields = src_s->getNumFields();
+  new_fields.reserve(num_fields);
+  for (unsigned i = 0; i < num_fields; ++i) {
+    if (const std::shared_ptr<VRAPtrNode> ptr_field =
+        std::dynamic_ptr_cast_or_null<VRAPtrNode>(src_s->getNodeAt(i))) {
+      new_fields.push_back(std::make_shared<VRAPtrNode>(ptr_field->getParent()));
+    } else if (i < dst_s->getNumFields()) {
+      new_fields.push_back(fillRangeHoles(std::static_ptr_cast<VRARangeNode>(src_s->getNodeAt(i)),
+                                          std::static_ptr_cast<VRARangeNode>(dst_s->getNodeAt(i))));
+    }
   }
-  return make_s_range(new_fields);
+  return std::make_shared<VRAStructNode>(new_fields);
 }

@@ -24,22 +24,22 @@ public:
 
   // Metadata Processing
   void harvestMetadata(llvm::Module &M);
-  generic_range_ptr_t harvestStructMD(mdutils::MDInfo *MD);
+  NodePtrT harvestStructMD(const mdutils::MDInfo *MD, const llvm::Type *T);
   void saveResults(llvm::Module &M);
-  bool isValidRange(mdutils::Range *rng) const;
+  bool isValidRange(const mdutils::Range *rng) const;
   void refreshRange(const llvm::Instruction* i);
-  static std::shared_ptr<mdutils::MDInfo> toMDInfo(const generic_range_ptr_t &r);
-  static void updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
-                           const generic_range_ptr_t &r);
+  std::shared_ptr<mdutils::MDInfo> toMDInfo(const RangeNodePtrT r);
+  void updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi, const RangeNodePtrT r);
   static void setConstRangeMetadata(mdutils::MetadataManager &MDManager,
                                     llvm::Instruction &i);
 
-  const generic_range_ptr_t fetchInfo(const llvm::Value* v) override;
-  range_node_ptr_t getOrCreateNode(const llvm::Value* v) override;
-  void setNode(const llvm::Value* V, range_node_ptr_t Node) override {
+  const range_ptr_t fetchRange(const llvm::Value *V) override;
+  using VRAStore::fetchRange;
+  const RangeNodePtrT fetchRangeNode(const llvm::Value* V) override;
+  void setNode(const llvm::Value* V, NodePtrT Node) override {
     VRAStore::setNode(V, Node);
   }
-  generic_range_ptr_t getUserInput(const llvm::Value *V) const;
+  RangeNodePtrT getUserInput(const llvm::Value *V) const;
 
   static bool classof(const AnalysisStore *AS) {
     return AS->getKind() == ASK_VRAGlobalStore;
@@ -50,8 +50,7 @@ public:
   }
 
 protected:
-  llvm::DenseMap<const llvm::Value*, generic_range_ptr_t> UserInput;
-  llvm::DenseMap<const llvm::Function*, generic_range_ptr_t> ReturnValues;
+  llvm::DenseMap<const llvm::Value*, RangeNodePtrT> UserInput;
 };
 
 } // end namespace taffo

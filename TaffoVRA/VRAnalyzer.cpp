@@ -48,9 +48,9 @@ VRAnalyzer::analyzeInstruction(llvm::Instruction *I) {
   else if (Instruction::isCast(OpCode)) {
     LLVM_DEBUG(Logger->logInstruction(&i));
     const llvm::Value* op = i.getOperand(0);
-    const generic_range_ptr_t info = fetchInfo(op);
-    const auto res = handleCastInstruction(info, OpCode, i.getType());
-    saveValueInfo(&i, res);
+    const range_ptr_t info = fetchRange(op);
+    const range_ptr_t res = handleCastInstruction(info, OpCode, i.getType());
+    saveValueRange(&i, res);
 
     LLVM_DEBUG(if (!info) Logger->logInfo("operand range is null"));
     LLVM_DEBUG(logRangeln(&i));
@@ -59,12 +59,10 @@ VRAnalyzer::analyzeInstruction(llvm::Instruction *I) {
     LLVM_DEBUG(Logger->logInstruction(&i));
     const llvm::Value* op1 = i.getOperand(0);
     const llvm::Value* op2 = i.getOperand(1);
-    const range_ptr_t info1 =
-      std::dynamic_ptr_cast_or_null<range_t>(fetchInfo(op1));
-    const range_ptr_t info2 =
-      std::dynamic_ptr_cast_or_null<range_t>(fetchInfo(op2));
-    const auto res = handleBinaryInstruction(info1, info2, OpCode);
-    saveValueInfo(&i, res);
+    const range_ptr_t info1 = fetchRange(op1);
+    const range_ptr_t info2 = fetchRange(op2);
+    const range_ptr_t res = handleBinaryInstruction(info1, info2, OpCode);
+    saveValueRange(&i, res);
 
     LLVM_DEBUG(if (!info1) Logger->logInfo("first range is null"));
     LLVM_DEBUG(if (!info2) Logger->logInfo("second range is null"));
@@ -73,31 +71,27 @@ VRAnalyzer::analyzeInstruction(llvm::Instruction *I) {
   else if (OpCode == llvm::Instruction::FNeg) {
     LLVM_DEBUG(Logger->logInstruction(&i));
     const llvm::Value* op1 = i.getOperand(0);
-    const range_ptr_t info1 =
-      std::dynamic_ptr_cast_or_null<range_t>(fetchInfo(op1));
+    const range_ptr_t info1 = fetchRange(op1);
     const auto res = handleUnaryInstruction(info1, OpCode);
-    saveValueInfo(&i, res);
+    saveValueRange(&i, res);
 
     LLVM_DEBUG(if (!info1) Logger->logInfo("operand range is null"));
     LLVM_DEBUG(logRangeln(&i));
   }
   else {
-    generic_range_ptr_t tmp;
     switch (OpCode) {
       // memory operations
       case llvm::Instruction::Alloca:
-        DerivedRanges[&i] = make_range_node(fetchInfo(&i));
+        handleAllocaInstr(I);
         break;
       case llvm::Instruction::Load:
-        tmp = handleLoadInstr(&i);
-        saveValueInfo(&i, tmp);
-        LLVM_DEBUG(logRangeln(&i));
+        handleLoadInstr(&i);
         break;
       case llvm::Instruction::Store:
         handleStoreInstr(&i);
         break;
       case llvm::Instruction::GetElementPtr:
-        tmp = handleGEPInstr(&i);
+        handleGEPInstr(&i);
         break;
       case llvm::Instruction::Fence:
         LLVM_DEBUG(Logger->logErrorln("Handling of Fence not supported yet"));
@@ -118,16 +112,13 @@ VRAnalyzer::analyzeInstruction(llvm::Instruction *I) {
         break;
       case llvm::Instruction::ICmp:
       case llvm::Instruction::FCmp:
-        tmp = handleCmpInstr(&i);
-        saveValueInfo(&i, tmp);
+        handleCmpInstr(&i);
         break;
       case llvm::Instruction::PHI:
-        tmp = handlePhiNode(&i);
-        saveValueInfo(&i, tmp);
+        handlePhiNode(&i);
         break;
       case llvm::Instruction::Select:
-        tmp = handleSelect(&i);
-        saveValueInfo(&i, tmp);
+        handleSelect(&i);
         break;
       case llvm::Instruction::UserOp1: // TODO implement
       case llvm::Instruction::UserOp2: // TODO implement
@@ -163,7 +154,7 @@ VRAnalyzer::analyzeInstruction(llvm::Instruction *I) {
 
 void
 VRAnalyzer::setPathLocalInfo(std::shared_ptr<CodeAnalyzer> SuccAnalyzer,
-                                     llvm::Instruction *TermInstr, unsigned SuccIdx) {
+                             llvm::Instruction *TermInstr, unsigned SuccIdx) {
   // TODO extract more specific ranges from cmp
 }
 
@@ -198,13 +189,11 @@ VRAnalyzer::prepareForCall(llvm::Instruction *I,
 
   LLVM_DEBUG(Logger->lineHead(); llvm::dbgs() << "Loading argument ranges: ");
   // fetch ranges of arguments
-  std::list<range_node_ptr_t> ArgRanges;
+  std::list<NodePtrT> ArgRanges;
   for (Value *Arg : CB->args()) {
-    if (isa<Constant>(Arg))
-      fetchInfo(Arg);
-    ArgRanges.push_back(getOrCreateNode(Arg));
+    ArgRanges.push_back(getNode(Arg));
 
-    LLVM_DEBUG(llvm::dbgs() << VRALogger::toString(fetchInfo(Arg)) << ", ");
+    LLVM_DEBUG(llvm::dbgs() << VRALogger::toString(fetchRangeNode(Arg)) << ", ");
   }
   LLVM_DEBUG(llvm::dbgs() << "\n");
 
@@ -223,9 +212,10 @@ VRAnalyzer::returnFromCall(llvm::Instruction *I,
 
   std::shared_ptr<VRAFunctionStore> FStore =
     std::static_ptr_cast<VRAFunctionStore>(FunctionStore);
-  generic_range_ptr_t Ret = FStore->getRetVal();
+  // TODO: support returning pointers
+  RangeNodePtrT Ret = std::dynamic_ptr_cast_or_null<VRARangeNode>(FStore->getRetVal());
   if (Ret) {
-    saveValueInfo(I, Ret);
+    saveValueRange(I, Ret);
     LLVM_DEBUG(logRangeln(I));
   } else {
     LLVM_DEBUG(Logger->logInfoln("function returns nothing"));
@@ -239,7 +229,7 @@ VRAnalyzer::returnFromCall(llvm::Instruction *I,
 
 void
 VRAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
-  const CallBase* CB = cast<CallBase>(I);
+  const CallBase* CB = llvm::cast<CallBase>(I);
   LLVM_DEBUG(Logger->logInstruction(I));
 
   // fetch function name
@@ -254,10 +244,10 @@ VRAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
     // fetch ranges of arguments
     std::list<range_ptr_t> ArgScalarRanges;
     for (Value *Arg : CB->args()) {
-      ArgScalarRanges.push_back(std::dynamic_ptr_cast_or_null<range_t>(fetchInfo(Arg)));
+      ArgScalarRanges.push_back(fetchRange(Arg));
     }
-    generic_range_ptr_t Res = handleMathCallInstruction(ArgScalarRanges, FunctionName);
-    saveValueInfo(I, Res);
+    range_ptr_t Res = handleMathCallInstruction(ArgScalarRanges, FunctionName);
+    saveValueRange(I, Res);
     LLVM_DEBUG(Logger->logInfo("whitelisted"));
     LLVM_DEBUG(Logger->logRangeln(Res));
   }
@@ -291,8 +281,8 @@ VRAnalyzer::handleMemCpyIntrinsics(const llvm::Instruction* memcpy) {
   const Value* dest = dest_bitcast->getOperand(0U);
   const Value* src = src_bitcast->getOperand(0U);
 
-  const generic_range_ptr_t src_range = fetchInfo(src);
-  saveValueInfo(dest, src_range);
+  const RangeNodePtrT src_range = fetchRangeNode(src);
+  saveValueRange(dest, src_range);
   LLVM_DEBUG(Logger->logRangeln(src_range));
 }
 
@@ -302,7 +292,7 @@ VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
   LLVM_DEBUG(Logger->logInstruction(ret));
   if (const llvm::Value* ret_val = ret_i->getReturnValue()) {
     const llvm::Function* ret_fun = ret_i->getFunction();
-    generic_range_ptr_t range = fetchInfo(ret_val);
+    RangeNodePtrT range = fetchRangeNode(ret_val);
 
     std::shared_ptr<VRAFunctionStore> FStore =
       std::static_ptr_cast<VRAFunctionStore>(CodeInt.getFunctionStore());
@@ -315,89 +305,99 @@ VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
 }
 
 void
-VRAnalyzer::handleStoreInstr(const llvm::Instruction* store) {
-  const llvm::StoreInst* store_i = cast<llvm::StoreInst>(store);
-  LLVM_DEBUG(Logger->logInstruction(store));
-  const llvm::Value* address_param = store_i->getPointerOperand();
-  const llvm::Value* value_param = store_i->getValueOperand();
-
-  if (value_param->getType()->isPointerTy()) {
-    LLVM_DEBUG(Logger->logInfoln("pointer store"));
-    if (isa<llvm::ConstantPointerNull>(value_param))
-      return;
-
-    if (isDescendant(address_param, value_param))
-      LLVM_DEBUG(Logger->logInfo("pointer circularity!"));
-    else {
-      const generic_range_ptr_t old_range = fetchInfo(address_param);
-      setNode(address_param, make_range_node(value_param, std::vector<unsigned>()));
-      saveValueInfo(address_param, old_range);
+VRAnalyzer::handleAllocaInstr(const llvm::Instruction *I) {
+  const llvm::AllocaInst *AI = llvm::cast<AllocaInst>(I);
+  const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(I);
+  if (AI->getAllocatedType()->isStructTy()) {
+    // TODO replace std::isa_ptr with assertion
+    if (std::isa_ptr<VRAStructNode>(InputRange)) {
+      DerivedRanges[I] = InputRange;
+    } else {
+      DerivedRanges[I] = std::make_shared<VRAStructNode>();
     }
+  } else {
+    if (InputRange && std::isa_ptr<VRAScalarNode>(InputRange)) {
+      DerivedRanges[I] = std::make_shared<VRAPtrNode>(InputRange);
+    } else {
+      DerivedRanges[I] = std::make_shared<VRAPtrNode>();
+    }
+  }
+}
+
+void
+VRAnalyzer::handleStoreInstr(const llvm::Instruction* I) {
+  const llvm::StoreInst* Store = llvm::cast<llvm::StoreInst>(I);
+  LLVM_DEBUG(Logger->logInstruction(I));
+  const llvm::Value* AddressParam = Store->getPointerOperand();
+  const llvm::Value* ValueParam = Store->getValueOperand();
+
+  if (llvm::isa<llvm::ConstantPointerNull>(ValueParam))
+    return;
+
+  NodePtrT AddressNode = getNode(AddressParam);
+  NodePtrT ValueNode = getNode(ValueParam);
+
+  storeNode(AddressNode, ValueNode);
+
+  LLVM_DEBUG(logRangeln(ValueParam));
+}
+
+void
+VRAnalyzer::handleLoadInstr(llvm::Instruction* I) {
+  llvm::LoadInst *Load = llvm::cast<llvm::LoadInst>(I);
+  LLVM_DEBUG(Logger->logInstruction(I));
+  const llvm::Value *PointerOp = Load->getPointerOperand();
+
+  NodePtrT Loaded = loadNode(getNode(PointerOp));
+
+  if (std::shared_ptr<VRAScalarNode> Scalar =
+      std::dynamic_ptr_cast_or_null<VRAScalarNode>(Loaded)) {
+    MemorySSA& memssa = CodeInt.getPass().getAnalysis<MemorySSAWrapperPass>(
+                          *I->getFunction()).getMSSA();
+    MemSSAUtils memssa_utils(memssa);
+    SmallVectorImpl<Value*>& def_vals = memssa_utils.getDefiningValues(Load);
+
+    Type *load_ty = fullyUnwrapPointerOrArrayType(Load->getType());
+    range_ptr_t res = Scalar->getRange();
+    for (Value *dval : def_vals) {
+      if (dval &&
+          load_ty->canLosslesslyBitCastTo(fullyUnwrapPointerOrArrayType(dval->getType())))
+        res = getUnionRange(res, fetchRange(dval));
+    }
+    saveValueRange(I, res);
+    LLVM_DEBUG(Logger->logRangeln(res));
+  } else {
+    setNode(I, Loaded);
+    LLVM_DEBUG(Logger->logInfoln("pointer load"));
+  }
+}
+
+void
+VRAnalyzer::handleGEPInstr(const llvm::Instruction* I) {
+  const llvm::GetElementPtrInst* Gep = llvm::cast<llvm::GetElementPtrInst>(I);
+  LLVM_DEBUG(Logger->logInstruction(Gep));
+
+  NodePtrT Node = getNode(Gep);
+  if (Node) {
+    LLVM_DEBUG(Logger->logInfoln("has node"));
     return;
   }
-
-  const generic_range_ptr_t range = fetchInfo(value_param);
-  saveValueInfo(address_param, range);
-  saveValueInfo(store_i, range);
-  LLVM_DEBUG(logRangeln(store_i));
-  return;
+  llvm::SmallVector<unsigned, 1U> Offset;
+  if (!extractGEPOffset(Gep->getSourceElementType(),
+                        iterator_range<User::const_op_iterator>(Gep->idx_begin(),
+                                                                Gep->idx_end()),
+                        Offset)) {
+      return;
+  }
+  Node = std::make_shared<VRAGEPNode>(getNode(Gep->getPointerOperand()), Offset);
+  setNode(I, Node);
 }
 
-generic_range_ptr_t
-VRAnalyzer::handleLoadInstr(llvm::Instruction* load) {
-  llvm::LoadInst* load_i = cast<llvm::LoadInst>(load);
-  LLVM_DEBUG(Logger->logInstruction(load));
-
-  if (load_i->getType()->isPointerTy()) {
-    LLVM_DEBUG(Logger->logInfo("pointer load"));
-    setNode(load_i, make_range_node(load_i->getPointerOperand(),
-                                    std::vector<unsigned>()));
-    return nullptr;
-  }
-
-  MemorySSA& memssa = CodeInt.getPass().getAnalysis<MemorySSAWrapperPass>(
-                        *load->getFunction()).getMSSA();
-  MemSSAUtils memssa_utils(memssa);
-  SmallVectorImpl<Value*>& def_vals = memssa_utils.getDefiningValues(load_i);
-  def_vals.push_back(load_i->getPointerOperand());
-
-  Type *load_ty = fullyUnwrapPointerOrArrayType(load->getType());
-  generic_range_ptr_t res = nullptr;
-  for (Value *dval : def_vals) {
-    if (dval &&
-        load_ty->canLosslesslyBitCastTo(fullyUnwrapPointerOrArrayType(dval->getType())))
-      res = getUnionRange(res, fetchInfo(dval));
-  }
-  return res;
-}
-
-generic_range_ptr_t
-VRAnalyzer::handleGEPInstr(const llvm::Instruction* gep) {
-  const llvm::GetElementPtrInst* gep_i = dyn_cast<llvm::GetElementPtrInst>(gep);
-  LLVM_DEBUG(Logger->logInstruction(gep_i));
-
-  range_node_ptr_t node = getNode(gep);
-  if (node != nullptr) {
-    if (node->hasRange())
-      return node->getRange();
-    LLVM_DEBUG(Logger->logInfoln("has node"));
-  } else {
-    std::vector<unsigned> offset;
-    if (!extractGEPOffset(gep_i->getSourceElementType(),
-                          iterator_range<User::const_op_iterator>(gep_i->idx_begin(),
-                                                                  gep_i->idx_end()),
-                          offset))
-      return nullptr;
-    node = make_range_node(gep_i->getPointerOperand(), offset);
-    DerivedRanges[gep] = node;
-  }
-
-  return fetchInfo(gep_i);
-}
-
+// TODO remove
+/*
 bool
 VRAnalyzer::isDescendant(const llvm::Value* parent,
-                                 const llvm::Value* desc) const {
+                         const llvm::Value* desc) const {
   if (!(parent && desc)) return false;
   if (parent == desc) return true;
   while (desc) {
@@ -408,50 +408,53 @@ VRAnalyzer::isDescendant(const llvm::Value* parent,
   }
   return false;
 }
+*/
 
-range_ptr_t
+void
 VRAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
-  const llvm::CmpInst* cmp_i = cast<llvm::CmpInst>(cmp);
+  const llvm::CmpInst* cmp_i = llvm::cast<llvm::CmpInst>(cmp);
   LLVM_DEBUG(Logger->logInstruction(cmp));
   const llvm::CmpInst::Predicate pred = cmp_i->getPredicate();
-  std::list<generic_range_ptr_t> ranges;
+  std::list<range_ptr_t> ranges;
   for (unsigned index = 0; index < cmp_i->getNumOperands(); index++) {
     const llvm::Value* op = cmp_i->getOperand(index);
-    generic_range_ptr_t op_range = fetchInfo(op);
-    ranges.push_back(op_range);
+    if (std::shared_ptr<VRAScalarNode> op_range =
+        std::dynamic_ptr_cast_or_null<VRAScalarNode>(fetchRangeNode(op))) {
+      ranges.push_back(op_range->getRange());
+    } else {
+      ranges.push_back(nullptr);
+    }
   }
   range_ptr_t result = std::dynamic_ptr_cast_or_null<range_t>(handleCompare(ranges, pred));
   LLVM_DEBUG(Logger->logRangeln(result));
-  return result;
+  saveValueRange(cmp, result);
 }
 
-generic_range_ptr_t
+void
 VRAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
-  const llvm::PHINode* phi_n = cast<llvm::PHINode>(phi);
+  const llvm::PHINode* phi_n = llvm::cast<llvm::PHINode>(phi);
   if (phi_n->getNumIncomingValues() < 1) {
-    return nullptr;
+    return;
   }
   LLVM_DEBUG(Logger->logInstruction(phi));
-  const llvm::Value* op0 = phi_n->getIncomingValue(0);
-  generic_range_ptr_t res = fetchInfo(op0);
-  for (unsigned index = 1; index < phi_n->getNumIncomingValues(); index++) {
+  RangeNodePtrT res = nullptr;
+  for (unsigned index = 0U; index < phi_n->getNumIncomingValues(); index++) {
     const llvm::Value* op = phi_n->getIncomingValue(index);
-    generic_range_ptr_t op_range = fetchInfo(op);
+    RangeNodePtrT op_range = fetchRangeNode(op);
     res = getUnionRange(res, op_range);
   }
   LLVM_DEBUG(Logger->logRangeln(res));
-  return res;
+  saveValueRange(phi, res);
 }
 
-generic_range_ptr_t
+void
 VRAnalyzer::handleSelect(const llvm::Instruction* i) {
   const llvm::SelectInst* sel = cast<llvm::SelectInst>(i);
   LLVM_DEBUG(Logger->logInstruction(sel));
-  // TODO: actually handle comparison.
-  generic_range_ptr_t res = getUnionRange(fetchInfo(sel->getFalseValue()),
-                                          fetchInfo(sel->getTrueValue()));
+  RangeNodePtrT res = getUnionRange(fetchRangeNode(sel->getFalseValue()),
+                                    fetchRangeNode(sel->getTrueValue()));
   LLVM_DEBUG(Logger->logRangeln(res));
-  return res;
+  saveValueRange(i, res);
 }
 
 
@@ -459,13 +462,28 @@ VRAnalyzer::handleSelect(const llvm::Instruction* i) {
 // Data Handling
 ////////////////////////////////////////////////////////////////////////////////
 
-const generic_range_ptr_t
-VRAnalyzer::fetchInfo(const llvm::Value* V) {
-  const generic_range_ptr_t Derived = VRAStore::fetchInfo(V);
-  if (Derived) {
-    if (std::isa_ptr<VRA_Structured_Range>(Derived)
-        && V->getType()->isPointerTy()) {
-      if (generic_range_ptr_t InputRange = getGlobalStore()->getUserInput(V)) {
+const range_ptr_t
+VRAnalyzer::fetchRange(const llvm::Value *V) {
+  if (const range_ptr_t Derived = VRAStore::fetchRange(V)) {
+    return Derived;
+  }
+
+  if (const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(V)) {
+    saveValueRange(V, InputRange);
+    if (const std::shared_ptr<VRAScalarNode> InputScalar =
+        std::dynamic_ptr_cast<VRAScalarNode>(InputRange)) {
+      return InputScalar->getRange();
+    }
+  }
+
+  return nullptr;
+}
+
+const RangeNodePtrT
+VRAnalyzer::fetchRangeNode(const llvm::Value* V) {
+  if (const RangeNodePtrT Derived = VRAStore::fetchRangeNode(V)) {
+    if (std::isa_ptr<VRAStructNode>(Derived)) {
+      if (RangeNodePtrT InputRange = getGlobalStore()->getUserInput(V)) {
         // fill null input_range fields with corresponding derived fields
         return fillRangeHoles(Derived, InputRange);
       }
@@ -473,17 +491,18 @@ VRAnalyzer::fetchInfo(const llvm::Value* V) {
     return Derived;
   }
 
-  const generic_range_ptr_t InputRange = getGlobalStore()->getUserInput(V);
-  if (InputRange) {
+  if (const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(V)) {
     // Save it in this store, so we don't overwrite it if it's final.
-    saveValueInfo(V, InputRange);
+    saveValueRange(V, InputRange);
+    return InputRange;
   }
-  return InputRange;
+
+  return nullptr;
 }
 
-range_node_ptr_t
-VRAnalyzer::getNode(const llvm::Value* v) const {
-  range_node_ptr_t LocalNode = VRAStore::getNode(v);
+NodePtrT
+VRAnalyzer::getNode(const llvm::Value* v) {
+  NodePtrT LocalNode = VRAStore::getNode(v);
   if (LocalNode)
     return LocalNode;
 
@@ -494,23 +513,8 @@ VRAnalyzer::getNode(const llvm::Value* v) const {
   return nullptr;
 }
 
-range_node_ptr_t
-VRAnalyzer::getOrCreateNode(const llvm::Value* v) {
-  range_node_ptr_t Node = VRAStore::getOrCreateNode(v);
-  if (Node) {
-    return Node;
-  }
-
-  if (isa<GlobalVariable>(v) || isa<Argument>(v)) {
-      // create root node in global analyzer
-      return getGlobalStore()->getOrCreateNode(v);
-  }
-
-  return nullptr;
-}
-
 void
-VRAnalyzer::setNode(const llvm::Value* V, range_node_ptr_t Node) {
+VRAnalyzer::setNode(const llvm::Value* V, NodePtrT Node) {
   if (isa<GlobalVariable>(V)) {
       // set node in global analyzer
       getGlobalStore()->setNode(V, Node);
@@ -529,5 +533,5 @@ VRAnalyzer::setNode(const llvm::Value* V, range_node_ptr_t Node) {
 void
 VRAnalyzer::logRangeln(const llvm::Value* v) {
   LLVM_DEBUG(if (getGlobalStore()->getUserInput(v)) dbgs() << "(from metadata) ");
-  LLVM_DEBUG(Logger->logRangeln(fetchInfo(v)));
+  LLVM_DEBUG(Logger->logRangeln(fetchRangeNode(v)));
 }

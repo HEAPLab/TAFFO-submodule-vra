@@ -29,13 +29,13 @@ VRAFunctionStore::newFunctionStore(CodeInterpreter &CI) {
 }
 
 void
-VRAFunctionStore::setRetVal(generic_range_ptr_t RetVal) {
+VRAFunctionStore::setRetVal(RangeNodePtrT RetVal) {
   ReturnValue = getUnionRange(ReturnValue, RetVal);
 }
 
 void
 VRAFunctionStore::setArgumentRanges(const llvm::Function &F,
-                                    const std::list<range_node_ptr_t> &AARanges) {
+                                    const std::list<NodePtrT> &AARanges) {
   assert(AARanges.size() == F.arg_size()
          && "Mismatch between number of actual and formal parameters.");
   auto derived_info_it = AARanges.begin();

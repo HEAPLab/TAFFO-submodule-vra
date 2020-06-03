@@ -56,7 +56,10 @@ handleCallToLog(const std::list<range_ptr_t>& operands) {
   if (!op) {
     return nullptr;
   }
-  assert(op->max() >= 0);
+  if (op->max() < 0.0) {
+    return make_range(std::numeric_limits<num_t>::quiet_NaN(),
+                      std::numeric_limits<num_t>::quiet_NaN());
+  }
   num_t min = (op->min() < 0) ? std::numeric_limits<num_t>::epsilon() : op->min();
   min = static_cast<num_t>(log(static_cast<double>(min)));
   num_t max = static_cast<num_t>(log(static_cast<double>(op->max())));

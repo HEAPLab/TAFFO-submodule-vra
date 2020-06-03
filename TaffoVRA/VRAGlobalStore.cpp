@@ -2,6 +2,7 @@
 
 #include "VRAnalyzer.hpp"
 #include "RangeOperations.hpp"
+#include <TypeUtils.h>
 
 using namespace llvm;
 using namespace taffo;
@@ -33,7 +34,7 @@ VRAGlobalStore::newFunctionStore(CodeInterpreter &CI) {
 ////////////////////////////////////////////////////////////////////////////////
 
 bool
-VRAGlobalStore::isValidRange(mdutils::Range *rng) const {
+VRAGlobalStore::isValidRange(const mdutils::Range *rng) const {
   return rng != nullptr && !std::isnan(rng->Min) && !std::isnan(rng->Max);
 }
 
@@ -42,23 +43,30 @@ VRAGlobalStore::harvestMetadata(Module &M) {
   using namespace mdutils;
   MetadataManager &MDManager = MetadataManager::getMetadataManager();
 
-  for (const auto &v : M.globals()) {
+  for (const llvm::GlobalVariable &v : M.globals()) {
     // retrieve info about global var v, if any
-    InputInfo *II = MDManager.retrieveInputInfo(v);
-    if (II != nullptr && isValidRange(II->IRange.get())) {
-      UserInput[&v] = make_range(II->IRange->Min, II->IRange->Max, II->isFinal());
-      DerivedRanges[&v] = make_range_node(UserInput[&v]);
-    } else if (StructInfo *SI = MDManager.retrieveStructInfo(v)) {
-      UserInput[&v] = harvestStructMD(SI);
-      DerivedRanges[&v] = make_range_node(UserInput[&v]);
+    const InputInfo *II = MDManager.retrieveInputInfo(v);
+    if (II && isValidRange(II->IRange.get())) {
+      auto SN = std::make_shared<VRAScalarNode>(
+                  make_range(II->IRange->Min, II->IRange->Max, II->isFinal()));
+      //UserInput[&v] = SN;
+      // TODO see if we can avoid this:
+      DerivedRanges[&v] = std::make_shared<VRAPtrNode>(SN);
+    } else if (const StructInfo *SI = MDManager.retrieveStructInfo(v)) {
+      UserInput[&v] = std::static_ptr_cast<VRARangeNode>(
+                        harvestStructMD(SI, fullyUnwrapPointerOrArrayType(v.getType())));
+      // TODO see if we can avoid this, avoid lookup otherwise:
+      DerivedRanges[&v] = UserInput[&v];
+    } else if (v.getValueType()->isStructTy()) {
+      DerivedRanges[&v] = std::make_shared<VRAStructNode>();
+    } else {
+      DerivedRanges[&v] = std::make_shared<VRAPtrNode>();
     }
   }
 
   for (llvm::Function &f : M.functions()) {
-    if (f.empty()) {
+    if (f.empty())
       continue;
-    }
-    const std::string name = f.getName();
 
     // retrieve info about function parameters
     SmallVector<mdutils::MDInfo*, 5U> argsII;
@@ -67,23 +75,29 @@ VRAGlobalStore::harvestMetadata(Module &M) {
     MetadataManager::retrieveInputInfoInitWeightMetadata(&f, argsW);
     auto itII = argsII.begin();
     auto itW = argsW.begin();
-    for (Argument &formal_arg : f.args()) {
+    for (const Argument &formal_arg : f.args()) {
       if (itII == argsII.end())
         break;
       if (itW != argsW.end()) {
         if (*itW == 1U) {
-          UserInput[&formal_arg] = harvestStructMD(*itII);
+          if (auto UINode = harvestStructMD(*itII,
+                fullyUnwrapPointerOrArrayType(formal_arg.getType()))) {
+            UserInput[&formal_arg] = std::static_ptr_cast<VRARangeNode>(UINode);
+          }
         }
         ++itW;
       } else {
-        UserInput[&formal_arg] = harvestStructMD(*itII);
+        if (auto UINode = harvestStructMD(*itII,
+              fullyUnwrapPointerOrArrayType(formal_arg.getType()))) {
+          UserInput[&formal_arg] = std::static_ptr_cast<VRARangeNode>(UINode);
+        }
       }
       ++itII;
     }
 
     // retrieve info about instructions, for each basic block bb
-    for (const auto &bb : f.getBasicBlockList()) {
-      for (const auto &i : bb.getInstList()) {
+    for (const llvm::BasicBlock &bb : f.getBasicBlockList()) {
+      for (const llvm::Instruction &i : bb.getInstList()) {
         // fetch info about Instruction i
         MDInfo *MDI = MDManager.retrieveMDInfo(&i);
         if (!MDI)
@@ -94,7 +108,7 @@ VRAGlobalStore::harvestMetadata(Module &M) {
         bool root = true;
         if (weight > 0) {
           if (isa<AllocaInst>(i)) {
-            // Kludge for alloca not to be always roots, please check
+            // Kludge for alloca not to be always roots
             root = false;
           }
           for (auto& v: i.operands()) {
@@ -123,12 +137,13 @@ VRAGlobalStore::harvestMetadata(Module &M) {
         if (InputInfo *II = dyn_cast<InputInfo>(MDI)) {
           if (isValidRange(II->IRange.get())) {
             const llvm::Value* i_ptr = &i;
-            UserInput[i_ptr] =
-              make_range(II->IRange->Min, II->IRange->Max, II->isFinal());
+            UserInput[i_ptr] = std::make_shared<VRAScalarNode>(
+                                 make_range(II->IRange->Min, II->IRange->Max, II->isFinal()));
           }
         } else if (StructInfo *SI = dyn_cast<StructInfo>(MDI)) {
           const llvm::Value* i_ptr = &i;
-          UserInput[i_ptr] = harvestStructMD(SI);
+          UserInput[i_ptr] = std::static_ptr_cast<VRARangeNode>(
+                               harvestStructMD(SI, fullyUnwrapPointerOrArrayType(i_ptr->getType())));
         }
       }
     }
@@ -137,25 +152,38 @@ VRAGlobalStore::harvestMetadata(Module &M) {
   return;
 }
 
-generic_range_ptr_t
-VRAGlobalStore::harvestStructMD(mdutils::MDInfo *MD) {
+NodePtrT
+VRAGlobalStore::harvestStructMD(const mdutils::MDInfo *MD, const llvm::Type *T) {
   using namespace mdutils;
   if (MD == nullptr) {
     return nullptr;
 
-  } else if (InputInfo *II = dyn_cast<InputInfo>(MD)) {
+  } else if (T->isArrayTy()) {
+    return harvestStructMD(MD, T->getArrayElementType());
+
+  } else if (T->isPointerTy() && !T->getPointerElementType()->isStructTy()) {
+    return std::make_shared<VRAPtrNode>(harvestStructMD(MD, T->getPointerElementType()));
+
+  } else if (const InputInfo *II = llvm::dyn_cast<InputInfo>(MD)) {
     if (isValidRange(II->IRange.get()))
-      return make_range(II->IRange->Min, II->IRange->Max, II->isFinal());
+      return std::make_shared<VRAScalarNode>(
+               make_range(II->IRange->Min, II->IRange->Max, II->isFinal()));
     else
       return nullptr;
 
-  } else if (StructInfo *SI = dyn_cast<StructInfo>(MD)) {
-    std::vector<generic_range_ptr_t> rngs;
+  } else if (const StructInfo *SI = llvm::dyn_cast<StructInfo>(MD)) {
+    if (T->isPointerTy())
+      T = T->getPointerElementType();
+    assert(T->isStructTy());
+
+    llvm::SmallVector<NodePtrT, 4U> Fields;
+    unsigned Idx = 0;
     for (auto it = SI->begin(); it != SI->end(); it++) {
-      rngs.push_back(harvestStructMD(it->get()));
+      Fields.push_back(harvestStructMD(it->get(), T->getStructElementType(Idx)));
+      ++Idx;
     }
 
-    return make_s_range(rngs);
+    return std::make_shared<VRAStructNode>(Fields);
   }
 
   llvm_unreachable("unknown type of MDInfo");
@@ -165,9 +193,9 @@ void
 VRAGlobalStore::saveResults(llvm::Module &M) {
   using namespace mdutils;
   MetadataManager &MDManager = MetadataManager::getMetadataManager();
-  for (GlobalVariable &v : M.globals()) {
-    const generic_range_ptr_t range = fetchInfo(&v);
-    if (range != nullptr) {
+  for (llvm::GlobalVariable &v : M.globals()) {
+    const RangeNodePtrT range = fetchRangeNode(&v);
+    if (range) {
       // retrieve info about global var v, if any
       if (MDInfo *mdi = MDManager.retrieveMDInfo(&v)) {
         std::shared_ptr<MDInfo> cpymdi(mdi->clone());
@@ -191,8 +219,7 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
       newII.reserve(f.arg_size());
       auto argsIt = argsII.begin();
       for (Argument &arg : f.args()) {
-        const generic_range_ptr_t range = fetchInfo(&arg);
-        if (range != nullptr) {
+        if (const RangeNodePtrT range = fetchRangeNode(&arg)) {
           if (argsIt != argsII.end() && *argsIt != nullptr) {
             std::shared_ptr<MDInfo> cpymdi((*argsIt)->clone());
             updateMDInfo(cpymdi, range);
@@ -215,16 +242,14 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
         setConstRangeMetadata(MDManager, i);
         if (isa<StoreInst>(i))
           continue;
-        refreshRange(&i);
-        const generic_range_ptr_t range = fetchInfo(&i);
-        if (range != nullptr) {
-          MDInfo *mdi = MDManager.retrieveMDInfo(&i);
-          if (mdi != nullptr) {
+        // TODO remove if useless:
+        // refreshRange(&i);
+        if (const RangeNodePtrT range = fetchRangeNode(&i)) {
+          if (MDInfo *mdi = MDManager.retrieveMDInfo(&i)) {
             std::shared_ptr<MDInfo> cpymdi(mdi->clone());
             updateMDInfo(cpymdi, range);
             MDManager.setMDInfoMetadata(&i, cpymdi.get());
-          } else {
-            std::shared_ptr<MDInfo> newmdi = toMDInfo(range);
+          } else if (std::shared_ptr<MDInfo> newmdi = toMDInfo(range)) {
             MDManager.setMDInfoMetadata(&i, newmdi.get());
           }
         }
@@ -234,6 +259,8 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
   return;
 }
 
+// TODO remove if useless:
+/*
 void
 VRAGlobalStore::refreshRange(const llvm::Instruction* i) {
   if (const LoadInst* li = dyn_cast_or_null<LoadInst>(i)) {
@@ -241,20 +268,27 @@ VRAGlobalStore::refreshRange(const llvm::Instruction* i) {
     saveValueInfo(li, newInfo);
   }
 }
+*/
 
 std::shared_ptr<mdutils::MDInfo>
-VRAGlobalStore::toMDInfo(const generic_range_ptr_t &r) {
+VRAGlobalStore::toMDInfo(const RangeNodePtrT r) {
   using namespace mdutils;
   if (r == nullptr) return nullptr;
-  if (const range_ptr_t scalar = std::dynamic_ptr_cast<range_t>(r)) {
-    return std::make_shared<InputInfo>(nullptr,
-                                       std::make_shared<Range>(scalar->min(), scalar->max()),
-                                       nullptr);
-  } else if (const range_s_ptr_t structr = std::dynamic_ptr_cast<range_s_t>(r)) {
+  if (const std::shared_ptr<VRAScalarNode> Scalar =
+      std::dynamic_ptr_cast<VRAScalarNode>(r)) {
+    if (range_ptr_t SRange = Scalar->getRange()) {
+      return std::make_shared<InputInfo>(nullptr,
+                                         std::make_shared<Range>(SRange->min(), SRange->max()),
+                                         nullptr);
+    }
+    return nullptr;
+  } else if (const std::shared_ptr<VRAStructNode> structr =
+             std::dynamic_ptr_cast<VRAStructNode>(r)) {
     SmallVector<std::shared_ptr<mdutils::MDInfo>, 4U> fields;
-    fields.reserve(structr->getNumRanges());
-    for (const generic_range_ptr_t f : structr->ranges())
-      fields.push_back(toMDInfo(f));
+    fields.reserve(structr->fields().size());
+    for (const NodePtrT f : structr->fields()) {
+      fields.push_back(toMDInfo(fetchRange(f)));
+    }
     return std::make_shared<StructInfo>(fields);
   }
   llvm_unreachable("Unknown range type.");
@@ -262,24 +296,27 @@ VRAGlobalStore::toMDInfo(const generic_range_ptr_t &r) {
 
 void
 VRAGlobalStore::updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
-                             const generic_range_ptr_t &r) {
+                             const RangeNodePtrT r) {
   using namespace mdutils;
   if (mdi == nullptr || r == nullptr) return;
-  if (const range_ptr_t scalar = std::dynamic_ptr_cast<range_t>(r)) {
+  if (const std::shared_ptr<VRAScalarNode> Scalar =
+      std::dynamic_ptr_cast<VRAScalarNode>(r)) {
+    range_ptr_t SRange = Scalar->getRange();
     std::shared_ptr<InputInfo> ii = std::static_ptr_cast<InputInfo>(mdi);
-    ii->IRange.reset(new Range(scalar->min(), scalar->max()));
+    ii->IRange.reset(new Range(SRange->min(), SRange->max()));
     return;
-  } else if (const range_s_ptr_t structr = std::dynamic_ptr_cast<range_s_t>(r)) {
+  } else if (const std::shared_ptr<VRAStructNode> structr =
+             std::dynamic_ptr_cast<VRAStructNode>(r)) {
     std::shared_ptr<StructInfo> si = std::static_ptr_cast<StructInfo>(mdi);
-    auto derfield_it = structr->ranges().begin();
-    auto derfield_end = structr->ranges().end();
+    auto derfield_it = structr->fields().begin();
+    auto derfield_end = structr->fields().end();
     for (StructInfo::size_type i = 0; i < si->size(); ++i) {
       if (derfield_it == derfield_end) break;
       std::shared_ptr<mdutils::MDInfo> mdfield = si->getField(i);
       if (mdfield)
-        updateMDInfo(mdfield, *derfield_it);
+        updateMDInfo(mdfield, fetchRange(*derfield_it));
       else
-        si->setField(i, toMDInfo(*derfield_it));
+        si->setField(i, toMDInfo(fetchRange(*derfield_it)));
 
       ++derfield_it;
     }
@@ -328,13 +365,28 @@ VRAGlobalStore::setConstRangeMetadata(mdutils::MetadataManager &MDManager,
 }
 
 
-const generic_range_ptr_t
-VRAGlobalStore::fetchInfo(const llvm::Value* V) {
-  const generic_range_ptr_t Derived = VRAStore::fetchInfo(V);
-  if (Derived) {
-    if (std::isa_ptr<VRA_Structured_Range>(Derived)
-        && V->getType()->isPointerTy()) {
-      if (generic_range_ptr_t InputRange = getUserInput(V)) {
+const range_ptr_t
+VRAGlobalStore::fetchRange(const llvm::Value *V) {
+  if (const range_ptr_t Derived = VRAStore::fetchRange(V)) {
+    return Derived;
+  }
+
+  if (const RangeNodePtrT InputRange = getUserInput(V)) {
+    saveValueRange(V, InputRange);
+    if (const std::shared_ptr<VRAScalarNode> InputScalar =
+        std::dynamic_ptr_cast<VRAScalarNode>(InputRange)) {
+      return InputScalar->getRange();
+    }
+  }
+
+  return nullptr;
+}
+
+const RangeNodePtrT
+VRAGlobalStore::fetchRangeNode(const llvm::Value* V) {
+  if (const RangeNodePtrT Derived = VRAStore::fetchRangeNode(V)) {
+    if (std::isa_ptr<VRAStructNode>(Derived)) {
+      if (RangeNodePtrT InputRange = getUserInput(V)) {
         // fill null input_range fields with corresponding derived fields
         return fillRangeHoles(Derived, InputRange);
       }
@@ -342,27 +394,16 @@ VRAGlobalStore::fetchInfo(const llvm::Value* V) {
     return Derived;
   }
 
-  return getUserInput(V);
-}
-
-range_node_ptr_t
-VRAGlobalStore::getOrCreateNode(const llvm::Value* v) {
-  range_node_ptr_t Node = VRAStore::getOrCreateNode(v);
-  if (Node) {
-    return Node;
-  }
-
-  if (isa<GlobalVariable>(v) || isa<Argument>(v)) {
-      // create root node in global analyzer
-      Node = make_range_node();
-      DerivedRanges[v] = Node;
-      return Node;
+  if (const RangeNodePtrT InputRange = getUserInput(V)) {
+    // Save it in this store, so we don't overwrite it if it's final.
+    saveValueRange(V, InputRange);
+    return InputRange;
   }
 
   return nullptr;
 }
 
-generic_range_ptr_t
+RangeNodePtrT
 VRAGlobalStore::getUserInput(const llvm::Value *V) const {
   auto UIt = UserInput.find(V);
   if (UIt != UserInput.end()) {

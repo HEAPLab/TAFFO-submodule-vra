@@ -21,15 +21,15 @@ public:
   bool hasValue(const llvm::Value *V) const override { return DerivedRanges.count(V); }
   std::shared_ptr<CILogger> getLogger() const override { return Logger; }
 
-  void setNode(const llvm::Value* V, range_node_ptr_t Node) override {
+  void setNode(const llvm::Value* V, NodePtrT Node) override {
     VRAStore::setNode(V, Node);
   }
 
   // Function handling stuff
-  generic_range_ptr_t getRetVal() const { return ReturnValue; }
-  void setRetVal(generic_range_ptr_t RetVal);
+  RangeNodePtrT getRetVal() const { return ReturnValue; }
+  void setRetVal(RangeNodePtrT RetVal);
   void setArgumentRanges(const llvm::Function &F,
-                         const std::list<range_node_ptr_t> &AARanges);
+                         const std::list<NodePtrT> &AARanges);
 
   static bool classof(const AnalysisStore *AS) {
     return AS->getKind() == ASK_VRAFunctionStore;
@@ -40,7 +40,7 @@ public:
   }
 
 protected:
-  generic_range_ptr_t ReturnValue;
+  RangeNodePtrT ReturnValue;
 };
 
 } // end namespace taffo
