@@ -575,7 +575,7 @@ taffo::getUnionRange(const RangeNodePtrT op1,
       new_fields.push_back(op1_f);
     } else {
       new_fields.push_back(getUnionRange(std::static_ptr_cast<VRARangeNode>(op1_f),
-                                         std::static_ptr_cast<VRARangeNode>(op2_s->getNodeAt(i))));
+                                         std::dynamic_ptr_cast_or_null<VRARangeNode>(op2_s->getNodeAt(i))));
     }
   }
   return std::make_shared<VRAStructNode>(new_fields);
@@ -598,8 +598,8 @@ taffo::fillRangeHoles(const RangeNodePtrT src,
         std::dynamic_ptr_cast_or_null<VRAPtrNode>(src_s->getNodeAt(i))) {
       new_fields.push_back(std::make_shared<VRAPtrNode>(ptr_field->getParent()));
     } else if (i < dst_s->getNumFields()) {
-      new_fields.push_back(fillRangeHoles(std::static_ptr_cast<VRARangeNode>(src_s->getNodeAt(i)),
-                                          std::static_ptr_cast<VRARangeNode>(dst_s->getNodeAt(i))));
+      new_fields.push_back(fillRangeHoles(std::dynamic_ptr_cast_or_null<VRARangeNode>(src_s->getNodeAt(i)),
+                                          std::dynamic_ptr_cast_or_null<VRARangeNode>(dst_s->getNodeAt(i))));
     }
   }
   return std::make_shared<VRAStructNode>(new_fields);

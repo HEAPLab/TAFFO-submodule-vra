@@ -45,7 +45,7 @@ VRAnalyzer::analyzeInstruction(llvm::Instruction *I) {
       || OpCode == Instruction::Invoke) {
     handleSpecialCall(&i);
   }
-  else if (Instruction::isCast(OpCode)) {
+  else if (Instruction::isCast(OpCode) && OpCode != llvm::Instruction::BitCast) {
     LLVM_DEBUG(Logger->logInstruction(&i));
     const llvm::Value* op = i.getOperand(0);
     const range_ptr_t info = fetchRange(op);
@@ -92,6 +92,9 @@ VRAnalyzer::analyzeInstruction(llvm::Instruction *I) {
         break;
       case llvm::Instruction::GetElementPtr:
         handleGEPInstr(&i);
+        break;
+      case llvm::Instruction::BitCast:
+        handleBitCastInstr(I);
         break;
       case llvm::Instruction::Fence:
         LLVM_DEBUG(Logger->logErrorln("Handling of Fence not supported yet"));
@@ -310,7 +313,7 @@ VRAnalyzer::handleAllocaInstr(const llvm::Instruction *I) {
   const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(I);
   if (AI->getAllocatedType()->isStructTy()) {
     // TODO replace std::isa_ptr with assertion
-    if (std::isa_ptr<VRAStructNode>(InputRange)) {
+    if (InputRange && std::isa_ptr<VRAStructNode>(InputRange)) {
       DerivedRanges[I] = InputRange;
     } else {
       DerivedRanges[I] = std::make_shared<VRAStructNode>();
@@ -391,6 +394,16 @@ VRAnalyzer::handleGEPInstr(const llvm::Instruction* I) {
   }
   Node = std::make_shared<VRAGEPNode>(getNode(Gep->getPointerOperand()), Offset);
   setNode(I, Node);
+}
+
+void
+VRAnalyzer::handleBitCastInstr(const llvm::Instruction* I) {
+  LLVM_DEBUG(Logger->logInstruction(I));
+  if (NodePtrT Node = getNode(I->getOperand(0U))) {
+    setNode(I, Node);
+    LLVM_DEBUG(Logger->logRangeln(Node));
+  }
+  LLVM_DEBUG(Logger->logInfoln("no node"));
 }
 
 // TODO remove

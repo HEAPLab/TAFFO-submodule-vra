@@ -43,7 +43,9 @@ VRAFunctionStore::setArgumentRanges(const llvm::Function &F,
 
   for (const llvm::Argument &formal_arg : F.args()) {
     assert(derived_info_it != derived_info_end);
-    setNode(&formal_arg, *derived_info_it);
+    if (*derived_info_it) {
+      setNode(&formal_arg, *derived_info_it);
+    }
     ++derived_info_it;
   }
 }

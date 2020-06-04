@@ -240,7 +240,7 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
     for (BasicBlock &bb : f.getBasicBlockList()) {
       for (Instruction &i : bb.getInstList()) {
         setConstRangeMetadata(MDManager, i);
-        if (isa<StoreInst>(i))
+        if (i.getOpcode() == llvm::Instruction::Store)
           continue;
         // TODO remove if useless:
         // refreshRange(&i);
@@ -250,7 +250,10 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
             updateMDInfo(cpymdi, range);
             MDManager.setMDInfoMetadata(&i, cpymdi.get());
           } else if (std::shared_ptr<MDInfo> newmdi = toMDInfo(range)) {
-            MDManager.setMDInfoMetadata(&i, newmdi.get());
+            if (std::isa_ptr<InputInfo>(newmdi)
+                || fullyUnwrapPointerOrArrayType(i.getType())->isStructTy()) {
+              MDManager.setMDInfoMetadata(&i, newmdi.get());
+            }
           }
         }
       } // end instruction
@@ -301,28 +304,29 @@ VRAGlobalStore::updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
   if (mdi == nullptr || r == nullptr) return;
   if (const std::shared_ptr<VRAScalarNode> Scalar =
       std::dynamic_ptr_cast<VRAScalarNode>(r)) {
-    range_ptr_t SRange = Scalar->getRange();
-    std::shared_ptr<InputInfo> ii = std::static_ptr_cast<InputInfo>(mdi);
-    ii->IRange.reset(new Range(SRange->min(), SRange->max()));
-    return;
+    if (range_ptr_t SRange = Scalar->getRange()) {
+      std::shared_ptr<InputInfo> ii = std::static_ptr_cast<InputInfo>(mdi);
+      ii->IRange.reset(new Range(SRange->min(), SRange->max()));
+    }
   } else if (const std::shared_ptr<VRAStructNode> structr =
              std::dynamic_ptr_cast<VRAStructNode>(r)) {
-    std::shared_ptr<StructInfo> si = std::static_ptr_cast<StructInfo>(mdi);
-    auto derfield_it = structr->fields().begin();
-    auto derfield_end = structr->fields().end();
-    for (StructInfo::size_type i = 0; i < si->size(); ++i) {
-      if (derfield_it == derfield_end) break;
-      std::shared_ptr<mdutils::MDInfo> mdfield = si->getField(i);
-      if (mdfield)
-        updateMDInfo(mdfield, fetchRange(*derfield_it));
-      else
-        si->setField(i, toMDInfo(fetchRange(*derfield_it)));
+    if (std::shared_ptr<StructInfo> si = std::dynamic_ptr_cast<StructInfo>(mdi)) {
+      auto derfield_it = structr->fields().begin();
+      auto derfield_end = structr->fields().end();
+      for (StructInfo::size_type i = 0; i < si->size(); ++i) {
+        if (derfield_it == derfield_end) break;
+        std::shared_ptr<mdutils::MDInfo> mdfield = si->getField(i);
+        if (mdfield)
+          updateMDInfo(mdfield, fetchRange(*derfield_it));
+        else
+          si->setField(i, toMDInfo(fetchRange(*derfield_it)));
 
-      ++derfield_it;
+        ++derfield_it;
+      }
     }
-    return;
+  } else {
+    llvm_unreachable("Unknown range type.");
   }
-  llvm_unreachable("Unknown range type.");
 }
 
 void
