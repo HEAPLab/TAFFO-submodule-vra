@@ -284,9 +284,9 @@ VRAnalyzer::handleMemCpyIntrinsics(const llvm::Instruction* memcpy) {
   const Value* dest = dest_bitcast->getOperand(0U);
   const Value* src = src_bitcast->getOperand(0U);
 
-  const RangeNodePtrT src_range = fetchRangeNode(src);
-  saveValueRange(dest, src_range);
-  LLVM_DEBUG(Logger->logRangeln(src_range));
+  const NodePtrT src_node = loadNode(getNode(src));
+  storeNode(getNode(dest), src_node);
+  LLVM_DEBUG(Logger->logRangeln(fetchRangeNode(src)));
 }
 
 void
@@ -402,8 +402,9 @@ VRAnalyzer::handleBitCastInstr(const llvm::Instruction* I) {
   if (NodePtrT Node = getNode(I->getOperand(0U))) {
     setNode(I, Node);
     LLVM_DEBUG(Logger->logRangeln(Node));
+  } else {
+    LLVM_DEBUG(Logger->logInfoln("no node"));
   }
-  LLVM_DEBUG(Logger->logInfoln("no node"));
 }
 
 // TODO remove
