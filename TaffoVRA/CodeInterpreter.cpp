@@ -73,7 +73,7 @@ std::shared_ptr<AnalysisStore>
 CodeInterpreter::getStoreForValue(const llvm::Value *V) const {
   assert(V && "Trying to get AnalysisStore for null value.");
 
-  if (llvm::isa<llvm::GlobalVariable>(V))
+  if (llvm::isa<llvm::Constant>(V))
     return GlobalStore;
 
   if (llvm::isa<llvm::Argument>(V)) {

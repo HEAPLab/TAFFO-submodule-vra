@@ -261,7 +261,7 @@ VRAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
         handleMemCpyIntrinsics(CB);
         break;
       default:
-        LLVM_DEBUG(Logger->logInfo("skipping intrinsic " + FunctionName));
+        LLVM_DEBUG(Logger->logInfoln("skipping intrinsic " + FunctionName));
     }
   }
   else {
@@ -447,23 +447,33 @@ VRAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
 void
 VRAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
   const llvm::PHINode* phi_n = llvm::cast<llvm::PHINode>(phi);
-  if (phi_n->getNumIncomingValues() < 1) {
+  if (phi_n->getNumIncomingValues() == 0U) {
     return;
   }
   LLVM_DEBUG(Logger->logInstruction(phi));
   RangeNodePtrT res = nullptr;
   for (unsigned index = 0U; index < phi_n->getNumIncomingValues(); index++) {
     const llvm::Value* op = phi_n->getIncomingValue(index);
-    RangeNodePtrT op_range = fetchRangeNode(op);
-    res = getUnionRange(res, op_range);
+    NodePtrT op_node = getNode(op);
+    if (!op_node)
+      continue;
+    if (RangeNodePtrT op_range =
+        std::dynamic_ptr_cast<VRARangeNode>(op_node)) {
+      res = getUnionRange(res, op_range);
+    } else if (std::isa_ptr<VRAPtrNode>(op_node)) {
+      setNode(phi, op_node);
+      LLVM_DEBUG(Logger->logInfoln("Pointer PHINode"));
+      return;
+    }
   }
+  setNode(phi, res);
   LLVM_DEBUG(Logger->logRangeln(res));
-  saveValueRange(phi, res);
 }
 
 void
 VRAnalyzer::handleSelect(const llvm::Instruction* i) {
   const llvm::SelectInst* sel = cast<llvm::SelectInst>(i);
+  // TODO handle pointer select
   LLVM_DEBUG(Logger->logInstruction(sel));
   RangeNodePtrT res = getUnionRange(fetchRangeNode(sel->getFalseValue()),
                                     fetchRangeNode(sel->getTrueValue()));
@@ -516,15 +526,24 @@ VRAnalyzer::fetchRangeNode(const llvm::Value* V) {
 
 NodePtrT
 VRAnalyzer::getNode(const llvm::Value* v) {
-  NodePtrT LocalNode = VRAStore::getNode(v);
-  if (LocalNode)
-    return LocalNode;
+  NodePtrT Node = VRAStore::getNode(v);
 
-  std::shared_ptr<VRAStore> ExternalStore = getAnalysisStoreForValue(v);
-  if (ExternalStore) {
-    return ExternalStore->VRAStore::getNode(v);
+  if (!Node) {
+    std::shared_ptr<VRAStore> ExternalStore = getAnalysisStoreForValue(v);
+    if (ExternalStore) {
+      Node = ExternalStore->getNode(v);
+    }
   }
-  return nullptr;
+
+  if (Node && Node->getKind() == VRANode::VRAScalarNodeK) {
+    auto UserInput =
+      std::dynamic_ptr_cast_or_null<VRAScalarNode>(getGlobalStore()->getUserInput(v));
+    if (UserInput && UserInput->isFinal()) {
+      Node = UserInput;
+    }
+  }
+
+  return Node;
 }
 
 void

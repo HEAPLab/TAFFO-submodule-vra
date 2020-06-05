@@ -19,7 +19,13 @@ public:
   void convexMerge(const AnalysisStore &Other) override;
   std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) override;
   std::shared_ptr<AnalysisStore> newFunctionStore(CodeInterpreter &CI) override;
-  bool hasValue(const llvm::Value *V) const override { return DerivedRanges.count(V); }
+
+  bool hasValue(const llvm::Value *V) const override {
+    auto It = DerivedRanges.find(V);
+    return (It != DerivedRanges.end() && It->second)
+      || (V && llvm::isa<llvm::Constant>(V));
+  }
+
   std::shared_ptr<CILogger> getLogger() const override { return Logger; }
 
   // Metadata Processing
@@ -36,10 +42,12 @@ public:
   const range_ptr_t fetchRange(const llvm::Value *V) override;
   using VRAStore::fetchRange;
   const RangeNodePtrT fetchRangeNode(const llvm::Value* V) override;
+  NodePtrT getNode(const llvm::Value* v) override;
   void setNode(const llvm::Value* V, NodePtrT Node) override {
     VRAStore::setNode(V, Node);
   }
   RangeNodePtrT getUserInput(const llvm::Value *V) const;
+  NodePtrT fetchConstant(const llvm::Constant* v);
 
   static bool classof(const AnalysisStore *AS) {
     return AS->getKind() == ASK_VRAGlobalStore;

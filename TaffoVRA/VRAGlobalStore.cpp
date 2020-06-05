@@ -49,18 +49,21 @@ VRAGlobalStore::harvestMetadata(Module &M) {
     if (II && isValidRange(II->IRange.get())) {
       auto SN = std::make_shared<VRAScalarNode>(
                   make_range(II->IRange->Min, II->IRange->Max, II->isFinal()));
-      //UserInput[&v] = SN;
-      // TODO see if we can avoid this:
+      UserInput[&v] = SN;
       DerivedRanges[&v] = std::make_shared<VRAPtrNode>(SN);
     } else if (const StructInfo *SI = MDManager.retrieveStructInfo(v)) {
-      UserInput[&v] = std::static_ptr_cast<VRARangeNode>(
-                        harvestStructMD(SI, fullyUnwrapPointerOrArrayType(v.getType())));
-      // TODO see if we can avoid this, avoid lookup otherwise:
-      DerivedRanges[&v] = UserInput[&v];
+      auto SN = std::static_ptr_cast<VRARangeNode>(
+                  harvestStructMD(SI, fullyUnwrapPointerOrArrayType(v.getType())));
+      UserInput[&v] = SN;
+      DerivedRanges[&v] = SN;
     } else if (v.getValueType()->isStructTy()) {
       DerivedRanges[&v] = std::make_shared<VRAStructNode>();
     } else {
-      DerivedRanges[&v] = std::make_shared<VRAPtrNode>();
+      NodePtrT Const = fetchConstant(&v);
+      if (Const && Const->getKind() == VRANode::VRAScalarNodeK)
+        DerivedRanges[&v] = std::make_shared<VRAPtrNode>(Const);
+      else
+        DerivedRanges[&v] = std::make_shared<VRAPtrNode>();
     }
   }
 
@@ -386,6 +389,21 @@ VRAGlobalStore::fetchRange(const llvm::Value *V) {
   return nullptr;
 }
 
+NodePtrT
+VRAGlobalStore::getNode(const llvm::Value* v) {
+  NodePtrT Node = VRAStore::getNode(v);
+  if (Node)
+    return Node;
+
+  if (const llvm::Constant* Const = llvm::dyn_cast_or_null<llvm::Constant>(v)) {
+    NodePtrT K = fetchConstant(Const);
+    DerivedRanges[v] = K;
+    return K;
+  }
+
+  return nullptr;
+}
+
 const RangeNodePtrT
 VRAGlobalStore::fetchRangeNode(const llvm::Value* V) {
   if (const RangeNodePtrT Derived = VRAStore::fetchRangeNode(V)) {
@@ -413,5 +431,133 @@ VRAGlobalStore::getUserInput(const llvm::Value *V) const {
   if (UIt != UserInput.end()) {
     return UIt->second;
   }
+  return nullptr;
+}
+
+NodePtrT
+VRAGlobalStore::fetchConstant(const llvm::Constant* kval) {
+  if (const llvm::ConstantInt* int_i = dyn_cast<llvm::ConstantInt>(kval)) {
+    const num_t k = static_cast<num_t>(int_i->getSExtValue());
+    return std::make_shared<VRAScalarNode>(make_range(k, k));
+  }
+  if (const llvm::ConstantFP* fp_i = dyn_cast<llvm::ConstantFP>(kval)) {
+    APFloat tmp = fp_i->getValueAPF();
+    bool losesInfo;
+    tmp.convert(APFloatBase::IEEEdouble(), APFloat::roundingMode::rmNearestTiesToEven, &losesInfo);
+    const num_t k = static_cast<num_t>(tmp.convertToDouble());
+    return std::make_shared<VRAScalarNode>(make_range(k, k));
+  }
+  if (const llvm::ConstantTokenNone* none_i = dyn_cast<llvm::ConstantTokenNone>(kval)) {
+    LLVM_DEBUG(Logger->logInfo("Warning: treating llvm::ConstantTokenNone as 0"));
+    return std::make_shared<VRAScalarNode>(make_range(0, 0));
+  }
+  if (const llvm::ConstantPointerNull* null_i = dyn_cast<llvm::ConstantPointerNull>(kval)) {
+    LLVM_DEBUG(Logger->logInfo("Warning: found llvm::ConstantPointerNull"));
+    return std::make_shared<VRAPtrNode>();
+  }
+  if (const llvm::UndefValue* undef_i = dyn_cast<llvm::UndefValue>(kval)) {
+    LLVM_DEBUG(Logger->logInfo("Warning: treating llvm::UndefValue as nullptr"));
+    return nullptr;
+  }
+  if (const llvm::ConstantAggregateZero* agg_zero_i = dyn_cast<llvm::ConstantAggregateZero>(kval)) {
+    llvm::Type* zero_type = agg_zero_i->getType();
+    if (llvm::dyn_cast<llvm::StructType>(zero_type)) {
+      llvm::SmallVector<NodePtrT, 1U> Fields;
+      const unsigned num_elements = agg_zero_i->getNumElements();
+      Fields.reserve(num_elements);
+      for (unsigned i = 0; i < num_elements; i++) {
+        Fields.push_back(fetchConstant(agg_zero_i->getElementValue(i)));
+      }
+      return std::make_shared<VRAStructNode>(Fields);
+    } else if (dyn_cast<llvm::SequentialType>(zero_type)) {
+      // arrayType or VectorType
+      const unsigned any_value = 0U;
+      return fetchConstant(agg_zero_i->getElementValue(any_value));
+    }
+    LLVM_DEBUG(Logger->logInfo("Found aggrated zeros which is neither struct neither array neither vector"));
+    return nullptr;
+  }
+  if (const llvm::ConstantDataSequential* seq =
+      dyn_cast<llvm::ConstantDataSequential>(kval)) {
+    const unsigned num_elements = seq->getNumElements();
+    range_ptr_t seq_range = nullptr;
+    for (unsigned i = 0; i < num_elements; i++) {
+      range_ptr_t other_range =
+        std::static_ptr_cast<VRAScalarNode>(fetchConstant(seq->getElementAsConstant(i)))->getRange();
+      seq_range = getUnionRange(seq_range, other_range);
+    }
+    return std::make_shared<VRAScalarNode>(seq_range);
+  }
+  if (const llvm::ConstantData* data = dyn_cast<llvm::ConstantData>(kval)) {
+    // FIXME should never happen -- all subcases handled before
+    LLVM_DEBUG(Logger->logInfo("Extract value from llvm::ConstantData not implemented yet"));
+    return nullptr;
+  }
+  if (const llvm::ConstantExpr* cexp_i = dyn_cast<llvm::ConstantExpr>(kval)) {
+    if (cexp_i->isGEPWithNoNotionalOverIndexing()) {
+      llvm::Value *pointer_op = cexp_i->getOperand(0U);
+      llvm::Type *source_element_type =
+        llvm::cast<llvm::PointerType>(pointer_op->getType()->getScalarType())->getElementType();
+      llvm::SmallVector<unsigned, 1U> offset;
+      if (extractGEPOffset(source_element_type,
+                           llvm::iterator_range<llvm::User::const_op_iterator>(cexp_i->op_begin()+1,
+                                                                               cexp_i->op_end()),
+                           offset)) {
+        return std::make_shared<VRAGEPNode>(getNode(pointer_op), offset);
+      }
+    }
+    LLVM_DEBUG(Logger->logInfo("Could not fold a llvm::ConstantExpr"));
+    return nullptr;
+  }
+  if (const llvm::ConstantAggregate* aggr_i = dyn_cast<llvm::ConstantAggregate>(kval)) {
+    // TODO implement
+    if (dyn_cast<llvm::ConstantStruct>(aggr_i)) {
+      LLVM_DEBUG(Logger->logInfo("Constant structs not supported yet"));
+      return nullptr;
+    } else {
+      // ConstantArray or ConstantVector
+      RangeNodePtrT res = nullptr;
+      for (unsigned idx = 0U; idx < aggr_i->getNumOperands(); ++idx) {
+        RangeNodePtrT element = std::dynamic_ptr_cast_or_null<VRARangeNode>(
+                                  fetchConstant(aggr_i->getAggregateElement(idx)));
+        res = getUnionRange(res, element);
+      }
+      return res;
+    }
+    return nullptr;
+  }
+  if (const llvm::BlockAddress* block_i = dyn_cast<llvm::BlockAddress>(kval)) {
+    LLVM_DEBUG(Logger->logInfo("Could not fetch range from llvm::BlockAddress"));
+    return nullptr;
+  }
+  if (const llvm::GlobalValue* gv_i = dyn_cast<llvm::GlobalValue>(kval)) {
+    if (const llvm::GlobalVariable* gvar_i = dyn_cast<llvm::GlobalVariable>(kval)) {
+      if (gvar_i->hasInitializer()) {
+        const llvm::Constant* init_val = gvar_i->getInitializer();
+        if (init_val) {
+          return fetchConstant(init_val);
+        }
+      }
+      LLVM_DEBUG(Logger->logInfo("Could not derive range from a Global Variable"));
+      return nullptr;
+    }
+    if (const llvm::GlobalAlias* alias_i = dyn_cast<llvm::GlobalAlias>(kval)) {
+      LLVM_DEBUG(Logger->logInfo("Found alias"));
+      const llvm::Constant* aliasee = alias_i->getAliasee();
+      return (aliasee) ? fetchConstant(aliasee) : nullptr;
+    }
+    if (const llvm::Function* f = dyn_cast<llvm::Function>(kval)) {
+      LLVM_DEBUG(Logger->logInfo("Could not derive range from a Constant Function"));
+      return nullptr;
+    }
+    if (const llvm::GlobalIFunc* fun_decl = dyn_cast<llvm::GlobalIFunc>(kval)) {
+      LLVM_DEBUG(Logger->logInfo("Could not derive range from a Function declaration"));
+      return nullptr;
+    }
+    // this line should never be reached
+    LLVM_DEBUG(Logger->logInfo("Could not fetch range from llvm::GlobalValue"));
+    return nullptr;
+  }
+  LLVM_DEBUG(Logger->logInfo("Could not fetch range from llvm::Constant"));
   return nullptr;
 }

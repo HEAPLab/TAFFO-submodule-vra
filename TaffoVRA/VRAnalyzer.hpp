@@ -21,7 +21,12 @@ public:
   void convexMerge(const AnalysisStore &Other) override;
   std::shared_ptr<CodeAnalyzer> newCodeAnalyzer(CodeInterpreter &CI) override;
   std::shared_ptr<AnalysisStore> newFunctionStore(CodeInterpreter &CI) override;
-  bool hasValue(const llvm::Value *V) const override { return DerivedRanges.count(V); }
+
+  bool hasValue(const llvm::Value *V) const override {
+    auto It = DerivedRanges.find(V);
+    return It != DerivedRanges.end() && It->second;
+  }
+
   std::shared_ptr<CILogger> getLogger() const override { return Logger; }
   std::shared_ptr<CodeAnalyzer> clone() override;
   void analyzeInstruction(llvm::Instruction *I) override;
