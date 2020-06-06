@@ -50,6 +50,8 @@ private:
   // Instruction Handlers
   void handleSpecialCall(const llvm::Instruction* I);
   void handleMemCpyIntrinsics(const llvm::Instruction* memcpy);
+  bool isMallocLike(const llvm::Function *F) const;
+  void handleMallocCall(const llvm::CallBase *CB);
   void handleReturn(const llvm::Instruction* ret);
 
   void handleAllocaInstr(const llvm::Instruction *I);

@@ -167,14 +167,10 @@ VRAnalyzer::requiresInterpretation(llvm::Instruction *I) const {
   if (llvm::CallBase *CB = llvm::dyn_cast<llvm::CallBase>(I)) {
     if (!CB->isIndirectCall()) {
       llvm::Function *Called = CB->getCalledFunction();
-      if (Called->isIntrinsic())
-        return false;
-
-      if (isMathCallInstruction(Called->getName())) {
-        return false;
-      }
+      return !(Called->isIntrinsic()
+               || isMathCallInstruction(Called->getName())
+               || isMallocLike(Called));
     }
-    // I is a call, but we have no special way of handling it.
     return true;
   }
   // I is not a call.
@@ -242,7 +238,7 @@ VRAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
     return;
   }
 
-  const std::string FunctionName = Callee->getName();
+  const llvm::StringRef FunctionName = Callee->getName();
   if (isMathCallInstruction(FunctionName)) {
     // fetch ranges of arguments
     std::list<range_ptr_t> ArgScalarRanges;
@@ -253,15 +249,16 @@ VRAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
     saveValueRange(I, Res);
     LLVM_DEBUG(Logger->logInfo("whitelisted"));
     LLVM_DEBUG(Logger->logRangeln(Res));
-  }
-  else if (Callee->isIntrinsic()) {
+  } else if (isMallocLike(Callee)) {
+    handleMallocCall(CB);
+  } else if (Callee->isIntrinsic()) {
     const auto IntrinsicsID = Callee->getIntrinsicID();
     switch (IntrinsicsID) {
       case llvm::Intrinsic::memcpy:
         handleMemCpyIntrinsics(CB);
         break;
       default:
-        LLVM_DEBUG(Logger->logInfoln("skipping intrinsic " + FunctionName));
+        LLVM_DEBUG(Logger->logInfoln("skipping intrinsic " + std::string(FunctionName)));
     }
   }
   else {
@@ -289,6 +286,44 @@ VRAnalyzer::handleMemCpyIntrinsics(const llvm::Instruction* memcpy) {
   LLVM_DEBUG(Logger->logRangeln(fetchRangeNode(src)));
 }
 
+bool
+VRAnalyzer::isMallocLike(const llvm::Function *F) const {
+  const llvm::StringRef FName = F->getName();
+  // TODO make sure this works in other platforms
+  return FName == "malloc" || FName == "calloc";
+}
+
+void
+VRAnalyzer::handleMallocCall(const llvm::CallBase *CB) {
+  LLVM_DEBUG(Logger->logInfo("malloc-like"));
+  const llvm::Type *AllocatedType = nullptr;
+  for (const llvm::Value *User : CB->users()) {
+    if (const llvm::BitCastInst *BCI = llvm::dyn_cast<llvm::BitCastInst>(User)) {
+      AllocatedType = BCI->getDestTy()->getPointerElementType();
+      break;
+    }
+  }
+
+  const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(CB);
+  if (AllocatedType && AllocatedType->isStructTy()) {
+    // TODO replace std::isa_ptr with assertion
+    if (InputRange && std::isa_ptr<VRAStructNode>(InputRange)) {
+      DerivedRanges[CB] = InputRange;
+    } else {
+      DerivedRanges[CB] = std::make_shared<VRAStructNode>();
+    }
+    LLVM_DEBUG(Logger->logInfoln("struct"));
+  } else {
+    if (!(AllocatedType && AllocatedType->isPointerTy())
+        && InputRange && std::isa_ptr<VRAScalarNode>(InputRange)) {
+      DerivedRanges[CB] = std::make_shared<VRAPtrNode>(InputRange);
+    } else {
+      DerivedRanges[CB] = std::make_shared<VRAPtrNode>();
+    }
+    LLVM_DEBUG(Logger->logInfoln("pointer"));
+  }
+}
+
 void
 VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
   const llvm::ReturnInst* ret_i = cast<llvm::ReturnInst>(ret);
@@ -310,6 +345,7 @@ VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
 void
 VRAnalyzer::handleAllocaInstr(const llvm::Instruction *I) {
   const llvm::AllocaInst *AI = llvm::cast<AllocaInst>(I);
+  LLVM_DEBUG(Logger->logInstruction(I));
   const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(I);
   if (AI->getAllocatedType()->isStructTy()) {
     // TODO replace std::isa_ptr with assertion
@@ -318,12 +354,14 @@ VRAnalyzer::handleAllocaInstr(const llvm::Instruction *I) {
     } else {
       DerivedRanges[I] = std::make_shared<VRAStructNode>();
     }
+    LLVM_DEBUG(Logger->logInfoln("struct"));
   } else {
     if (InputRange && std::isa_ptr<VRAScalarNode>(InputRange)) {
       DerivedRanges[I] = std::make_shared<VRAPtrNode>(InputRange);
     } else {
       DerivedRanges[I] = std::make_shared<VRAPtrNode>();
     }
+    LLVM_DEBUG(Logger->logInfoln("pointer"));
   }
 }
 
