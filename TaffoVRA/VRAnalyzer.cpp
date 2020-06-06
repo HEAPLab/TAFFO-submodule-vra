@@ -379,9 +379,13 @@ VRAnalyzer::handleStoreInstr(const llvm::Instruction* I) {
   NodePtrT AddressNode = getNode(AddressParam);
   NodePtrT ValueNode = getNode(ValueParam);
 
+  if (!ValueNode && !ValueParam->getType()->isPointerTy()) {
+    ValueNode = fetchRangeNode(I);
+  }
+
   storeNode(AddressNode, ValueNode);
 
-  LLVM_DEBUG(logRangeln(ValueParam));
+  LLVM_DEBUG(Logger->logRangeln(ValueNode));
 }
 
 void
@@ -408,9 +412,11 @@ VRAnalyzer::handleLoadInstr(llvm::Instruction* I) {
     }
     saveValueRange(I, res);
     LLVM_DEBUG(Logger->logRangeln(res));
-  } else {
+  } else if (Loaded) {
     setNode(I, Loaded);
     LLVM_DEBUG(Logger->logInfoln("pointer load"));
+  } else {
+    LLVM_DEBUG(Logger->logInfoln("unable to retrieve loaded value"));
   }
 }
 
@@ -497,9 +503,9 @@ VRAnalyzer::handlePhiNode(const llvm::Instruction* phi) {
     if (!op_node)
       continue;
     if (RangeNodePtrT op_range =
-        std::dynamic_ptr_cast<VRARangeNode>(op_node)) {
+        std::dynamic_ptr_cast<VRAScalarNode>(op_node)) {
       res = getUnionRange(res, op_range);
-    } else if (std::isa_ptr<VRAPtrNode>(op_node)) {
+    } else {
       setNode(phi, op_node);
       LLVM_DEBUG(Logger->logInfoln("Pointer PHINode"));
       return;

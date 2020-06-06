@@ -55,6 +55,8 @@ VRAStore::fetchRangeNode(const llvm::Value* v) {
 void
 VRAStore::saveValueRange(const llvm::Value* v,
                          const range_ptr_t Range) {
+  if (!Range)
+    return;
   // TODO: make specialized version of this to avoid creating useless node
   saveValueRange(v, std::make_shared<VRAScalarNode>(Range));
 }
@@ -63,6 +65,9 @@ void
 VRAStore::saveValueRange(const llvm::Value* v,
                          const RangeNodePtrT Range) {
   assert(v && "Trying to save range for null value.");
+  if (!Range)
+    return;
+
   if (NodePtrT Union = assignScalarRange(getNode(v), Range)) {
     DerivedRanges[v] = Union;
     return;

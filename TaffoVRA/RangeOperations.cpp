@@ -489,7 +489,7 @@ taffo::copyRange(const RangeNodePtrT op) {
     return nullptr;
 
   if (const std::shared_ptr<VRAScalarNode> op_s =
-      std::static_ptr_cast<VRAScalarNode>(op)) {
+      std::dynamic_ptr_cast<VRAScalarNode>(op)) {
     return std::make_shared<VRAScalarNode>(copyRange(op_s->getRange()));
   }
 
