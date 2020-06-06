@@ -290,7 +290,8 @@ bool
 VRAnalyzer::isMallocLike(const llvm::Function *F) const {
   const llvm::StringRef FName = F->getName();
   // TODO make sure this works in other platforms
-  return FName == "malloc" || FName == "calloc";
+  return FName == "malloc" || FName == "calloc"
+    || FName == "_Znwm" || FName == "_Znam";
 }
 
 void
