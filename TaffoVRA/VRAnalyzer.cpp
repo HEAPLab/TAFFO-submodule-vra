@@ -471,7 +471,7 @@ VRAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {
   for (unsigned index = 0; index < cmp_i->getNumOperands(); index++) {
     const llvm::Value* op = cmp_i->getOperand(index);
     if (std::shared_ptr<VRAScalarNode> op_range =
-        std::dynamic_ptr_cast_or_null<VRAScalarNode>(fetchRangeNode(op))) {
+        std::dynamic_ptr_cast_or_null<VRAScalarNode>(getNode(op))) {
       ranges.push_back(op_range->getRange());
     } else {
       ranges.push_back(nullptr);
@@ -531,7 +531,6 @@ VRAnalyzer::fetchRange(const llvm::Value *V) {
   }
 
   if (const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(V)) {
-    saveValueRange(V, InputRange);
     if (const std::shared_ptr<VRAScalarNode> InputScalar =
         std::dynamic_ptr_cast<VRAScalarNode>(InputRange)) {
       return InputScalar->getRange();
@@ -554,8 +553,6 @@ VRAnalyzer::fetchRangeNode(const llvm::Value* V) {
   }
 
   if (const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(V)) {
-    // Save it in this store, so we don't overwrite it if it's final.
-    saveValueRange(V, InputRange);
     return InputRange;
   }
 
@@ -598,7 +595,7 @@ VRAnalyzer::setNode(const llvm::Value* V, NodePtrT Node) {
     return;
   }
 
-  DerivedRanges[V] = Node;
+  VRAStore::setNode(V, Node);
 }
 
 void
