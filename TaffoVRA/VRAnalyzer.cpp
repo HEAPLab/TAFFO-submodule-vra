@@ -307,7 +307,6 @@ VRAnalyzer::handleMallocCall(const llvm::CallBase *CB) {
 
   const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(CB);
   if (AllocatedType && AllocatedType->isStructTy()) {
-    // TODO replace std::isa_ptr with assertion
     if (InputRange && std::isa_ptr<VRAStructNode>(InputRange)) {
       DerivedRanges[CB] = InputRange;
     } else {
@@ -349,7 +348,6 @@ VRAnalyzer::handleAllocaInstr(const llvm::Instruction *I) {
   LLVM_DEBUG(Logger->logInstruction(I));
   const RangeNodePtrT InputRange = getGlobalStore()->getUserInput(I);
   if (AI->getAllocatedType()->isStructTy()) {
-    // TODO replace std::isa_ptr with assertion
     if (InputRange && std::isa_ptr<VRAStructNode>(InputRange)) {
       DerivedRanges[I] = InputRange;
     } else {
@@ -451,23 +449,6 @@ VRAnalyzer::handleBitCastInstr(const llvm::Instruction* I) {
     LLVM_DEBUG(Logger->logInfoln("no node"));
   }
 }
-
-// TODO remove
-/*
-bool
-VRAnalyzer::isDescendant(const llvm::Value* parent,
-                         const llvm::Value* desc) const {
-  if (!(parent && desc)) return false;
-  if (parent == desc) return true;
-  while (desc) {
-    range_node_ptr_t desc_node = getNode(desc);
-    desc = (desc_node) ? desc_node->getParent() : nullptr;
-    if (desc == parent)
-      return true;
-  }
-  return false;
-}
-*/
 
 void
 VRAnalyzer::handleCmpInstr(const llvm::Instruction* cmp) {

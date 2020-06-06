@@ -26,8 +26,6 @@ public:
   virtual void setNode(const llvm::Value* V, NodePtrT Node);
   virtual NodePtrT loadNode(const NodePtrT Node) const;
   virtual void storeNode(NodePtrT Dst, const NodePtrT Src);
-  //virtual void setRange(range_node_ptr_t node, const generic_range_ptr_t& info,
-  //                      std::list<std::vector<unsigned>>& offset);
 
   enum VRAStoreKind { VRASK_VRAGlobalStore, VRASK_VRAnalyzer, VRASK_VRAFunctionStore };
   VRAStoreKind getKind() const { return Kind; }

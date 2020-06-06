@@ -8,7 +8,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 
 #include <Metadata.h>
-#include "RangeNode.hpp"
+#include "PtrCasts.hpp"
 
 namespace taffo {
 

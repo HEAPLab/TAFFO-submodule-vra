@@ -277,49 +277,6 @@ VRAStore::fetchRange(const NodePtrT Node,
   }
 }
 
-// TODO: delete
-/*
-void
-VRAStore::setRange(NodePtrT Node, const RangeNodePtrT& Range,
-                   llvm::SmallVectorImpl<unsigned>& Offset) {
-  if (!Node || !Range) return;
-  switch (Node->getKind()) {
-    case VRAScalarNodeK: {
-      std::shared_ptr<VRAScalarNode> ScalarNode =
-          std::static_ptr_cast<VRAScalarNode>(Node);
-      const std::shared_ptr<VRAScalarNode> ScalarRange =
-          std::static_ptr_cast<VRAScalarNode>(Range);
-      ScalarNode->setRange(ScalarRange->getRange());
-    }
-    case VRAStructNodeK: {
-      std::shared_ptr<VRAStructNode> StructNode =
-        std::static_ptr_cast<VRAStructNode>(Node);
-      if (Offset.empty()) {
-        std::shared_ptr<VRAStructNode> StructRange =
-          std::static_ptr_cast<VRAStructNode>(Range);
-        StructNode->copyFields(StructRange);
-      } else {
-        NodePtrT Field = StructNode->getNodeAt(Offset.back());
-        Offset.pop_back();
-        return fetchRange(Field, Offset);
-      }
-    case VRAGEPNodeK: {
-      std::shared_ptr<VRAGEPNode> GEPNode =
-        std::dynamic_ptr_cast<VRAGEPNode>(Node);
-      Offset.append(GEPNode->getOffset());
-      return fetchRange(GEPNode->getParent(), Offset);
-    }
-    case VRAPtrNodeK: {
-      std::shared_ptr<VRAPtrNode> PtrNode =
-        std::dynamic_ptr_cast<VRAPtrNode>(Node);
-      return fetchRange(PtrNode->getParent(), Offset);
-    }
-    default:
-      llvm_unreachable("Unhandled node type.");
-  }
-}
-*/
-
 bool
 VRAStore::extractGEPOffset(const llvm::Type* source_element_type,
                            const llvm::iterator_range<llvm::User::const_op_iterator> indices,

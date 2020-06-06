@@ -59,7 +59,6 @@ private:
   void handleLoadInstr(llvm::Instruction* load);
   void handleGEPInstr(const llvm::Instruction* gep);
   void handleBitCastInstr(const llvm::Instruction* I);
-  //bool isDescendant(const llvm::Value* parent, const llvm::Value* desc) const;
 
   void handleCmpInstr(const llvm::Instruction* cmp);
   void handlePhiNode(const llvm::Instruction* phi);

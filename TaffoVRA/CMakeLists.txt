@@ -1,4 +1,5 @@
 add_llvm_library(TaffoVRA MODULE
+  PtrCasts.hpp
   RangeOperationsCallWhitelist.cpp
   RangeOperationsCallWhitelist.hpp
   RangeOperations.cpp

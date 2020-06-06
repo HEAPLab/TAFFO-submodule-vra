@@ -245,8 +245,6 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
         setConstRangeMetadata(MDManager, i);
         if (i.getOpcode() == llvm::Instruction::Store)
           continue;
-        // TODO remove if useless:
-        // refreshRange(&i);
         if (const RangeNodePtrT range = fetchRangeNode(&i)) {
           if (MDInfo *mdi = MDManager.retrieveMDInfo(&i)) {
             std::shared_ptr<MDInfo> cpymdi(mdi->clone());
@@ -264,17 +262,6 @@ VRAGlobalStore::saveResults(llvm::Module &M) {
   } // end function
   return;
 }
-
-// TODO remove if useless:
-/*
-void
-VRAGlobalStore::refreshRange(const llvm::Instruction* i) {
-  if (const LoadInst* li = dyn_cast_or_null<LoadInst>(i)) {
-    const generic_range_ptr_t newInfo = fetchInfo(li->getPointerOperand());
-    saveValueInfo(li, newInfo);
-  }
-}
-*/
 
 std::shared_ptr<mdutils::MDInfo>
 VRAGlobalStore::toMDInfo(const RangeNodePtrT r) {
