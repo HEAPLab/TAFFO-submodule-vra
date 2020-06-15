@@ -167,9 +167,9 @@ VRAnalyzer::requiresInterpretation(llvm::Instruction *I) const {
   if (llvm::CallBase *CB = llvm::dyn_cast<llvm::CallBase>(I)) {
     if (!CB->isIndirectCall()) {
       llvm::Function *Called = CB->getCalledFunction();
-      return !(Called->isIntrinsic()
-               || isMathCallInstruction(Called->getName())
-               || isMallocLike(Called));
+      return Called && !(Called->isIntrinsic()
+                         || isMathCallInstruction(Called->getName())
+                         || isMallocLike(Called));
     }
     return true;
   }
