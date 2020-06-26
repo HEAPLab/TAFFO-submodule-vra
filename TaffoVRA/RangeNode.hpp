@@ -5,101 +5,120 @@
 
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 
 #include <memory>
 
 namespace taffo {
 
-struct VRA_RangeNode {
+class VRANode {
+public:
+  enum VRANodeKind { VRAPtrNodeK, VRAGEPNodeK, VRAStructNodeK, VRAScalarNodeK };
+  VRANodeKind getKind() const { return Kind; }
+
+protected:
+  VRANode(VRANodeKind K) : Kind(K) {}
+
 private:
-	const llvm::Value* parent;
-	std::vector<unsigned> parent_offset;
-	generic_range_ptr_t range;
-	bool _hasRange;
+  const VRANodeKind Kind;
+};
+using NodePtrT = std::shared_ptr<VRANode>;
 
+class VRAPtrNode : public VRANode {
 public:
-	VRA_RangeNode()
-		: parent(nullptr), parent_offset(), range(nullptr), _hasRange(false) {}
-	VRA_RangeNode(const generic_range_ptr_t& r)
-		: parent(nullptr), parent_offset(), range(r), _hasRange(true) {}
+  VRAPtrNode()
+    : VRANode(VRAPtrNodeK), Parent(nullptr) {}
 
-	VRA_RangeNode(const llvm::Value* p, std::vector<unsigned> offset)
-		: parent(p), parent_offset(offset), range(nullptr), _hasRange(false) {}
+  VRAPtrNode(NodePtrT P)
+    : VRANode(VRAPtrNodeK), Parent(P) {}
 
-public:
-	inline const llvm::Value* getParent() const {return parent;}
+  NodePtrT getParent() const { return Parent; }
+  void setParent(NodePtrT P) { Parent = P; }
 
-	inline const bool hasParent() const { return parent != nullptr; }
+  static bool classof(const VRANode *N) {
+    return N->getKind() >= VRAPtrNodeK
+      && N->getKind() <= VRAGEPNodeK;
+  }
 
-	inline const std::vector<unsigned> getOffset() const {return parent_offset;}
+protected:
+  NodePtrT Parent;
 
-	inline generic_range_ptr_t getRange() const {return range;}
-
-	inline bool hasRange() const {return _hasRange;}
-
-	inline bool isScalar() const {
-		return hasRange()
-		  && std::dynamic_ptr_cast_or_null<range_t>(range) != nullptr;
-	}
-
-	inline bool isStruct() const {
-		return hasRange()
-		  && std::dynamic_ptr_cast_or_null<VRA_Structured_Range>(range) != nullptr;
-	}
-
-	inline void setScalarRange(const range_ptr_t& r) {
-		range = r;
-		_hasRange = true;
-		return;
-	}
-
-	inline void setRange(const generic_range_ptr_t& r) {
-		range = r;
-		_hasRange = true;
-		return;
-	}
-
-	inline void setStructRange(const range_s_ptr_t& r) {
-		range = r;
-		_hasRange = true;
-		return;
-	}
-
-	inline range_ptr_t getScalarRange() const {
-		if (!isScalar()) {
-			return nullptr;
-		}
-		return std::static_pointer_cast<range_t>(range);
-	}
-
-	inline range_s_ptr_t getStructRange() const {
-		if (!isStruct()) {
-			return nullptr;
-		}
-		return std::static_pointer_cast<VRA_Structured_Range>(range);
-	}
-
+  VRAPtrNode(VRANodeKind K, NodePtrT P)
+    : VRANode(K), Parent(P) {}
 };
 
-using range_node_ptr_t = std::shared_ptr<VRA_RangeNode>;
-template<class... Args>
-static inline range_node_ptr_t make_range_node(Args&&... args) {
-  return std::make_shared<VRA_RangeNode>(std::forward<Args>(args)...);
-}
+class VRAGEPNode : public VRAPtrNode {
+public:
+  VRAGEPNode(NodePtrT Parent, llvm::ArrayRef<unsigned> Offset)
+    : VRAPtrNode(VRAGEPNodeK, Parent), ParentOffset(Offset.begin(), Offset.end()) {}
 
-// someday I will remember why I wrote it....
-static bool isStructEquivalent(const llvm::Type* type) {
-	if (type->isStructTy()) {
-		return true;
-	}
-	if (type->isArrayTy()) {
-		return isStructEquivalent(type->getArrayElementType());
-	}
-	if (type->isPointerTy()) {
-		return isStructEquivalent(type->getPointerElementType());
-	}
-	return false;
-}
+  const llvm::ArrayRef<unsigned> getOffset() const { return ParentOffset; }
+
+  static bool classof(const VRANode *N) {
+    return N->getKind() == VRAGEPNodeK;
+  }
+
+protected:
+  llvm::SmallVector<unsigned, 1U> ParentOffset;
+};
+
+class VRARangeNode : public VRANode {
+public:
+  static bool classof(const VRANode *N) {
+    return N->getKind() >= VRAStructNodeK
+      && N->getKind() <= VRAScalarNodeK;
+  }
+
+protected:
+  VRARangeNode(VRANodeKind K) : VRANode(K) {}
+};
+using RangeNodePtrT = std::shared_ptr<VRARangeNode>;
+
+class VRAStructNode : public VRARangeNode {
+public:
+  VRAStructNode()
+    : VRARangeNode(VRAStructNodeK), Fields() {}
+
+  VRAStructNode(llvm::ArrayRef<NodePtrT> Fields)
+    : VRARangeNode(VRAStructNodeK), Fields(Fields.begin(), Fields.end()) {}
+
+  const llvm::ArrayRef<NodePtrT> fields() const { return Fields; }
+  unsigned getNumFields() const { return Fields.size(); }
+  NodePtrT getNodeAt(unsigned Idx) const {
+    return (Idx < Fields.size()) ? Fields[Idx] : nullptr;
+  }
+
+  void setNodeAt(unsigned Idx, NodePtrT Node) {
+    if (Idx >= Fields.size())
+      Fields.resize(Idx + 1U, nullptr);
+    Fields[Idx] = Node;
+  }
+
+  static bool classof(const VRANode *N) {
+    return N->getKind() == VRAStructNodeK;
+  }
+
+protected:
+  llvm::SmallVector<NodePtrT, 4U> Fields;
+};
+
+class VRAScalarNode : public VRARangeNode {
+public:
+  VRAScalarNode(const range_ptr_t Range)
+    : VRARangeNode(VRAScalarNodeK), Range(Range) {}
+
+  range_ptr_t getRange() const { return Range; }
+  void setRange(range_ptr_t R) { Range = R; }
+  bool isFinal() const { return Range && Range->isFinal(); }
+
+  static bool classof(const VRANode *N) {
+    return N->getKind() == VRAScalarNodeK;
+  }
+
+protected:
+  range_ptr_t Range;
+};
 
 } /* taffo */
 

@@ -1,4 +1,5 @@
 add_llvm_library(TaffoVRA MODULE
+  PtrCasts.hpp
   RangeOperationsCallWhitelist.cpp
   RangeOperationsCallWhitelist.hpp
   RangeOperations.cpp
@@ -11,6 +12,17 @@ add_llvm_library(TaffoVRA MODULE
   MemSSAUtils.hpp
   IndirectCallWhitelist.cpp
   IndirectCallWhitelist.hpp
+  CodeInterpreter.cpp
+  CodeInterpreter.hpp
+  VRAStore.cpp
+  VRAStore.hpp
+  VRAnalyzer.cpp
+  VRAnalyzer.hpp
+  VRAGlobalStore.cpp
+  VRAGlobalStore.hpp
+  VRAFunctionStore.cpp
+  VRAFunctionStore.hpp
+  VRALogger.hpp
 
   PLUGIN_TOOL
   opt
