@@ -21,7 +21,7 @@ ValueRangeAnalysis::runOnModule(Module &M) {
   std::shared_ptr<VRAGlobalStore> GlobalStore = std::make_shared<VRAGlobalStore>();
   GlobalStore->harvestMetadata(M);
 
-  CodeInterpreter CodeInt(*this, GlobalStore, Unroll);
+  CodeInterpreter CodeInt(*this, GlobalStore, Unroll, MaxUnroll);
   processModule(CodeInt, M);
 
   GlobalStore->saveResults(M);

@@ -216,7 +216,7 @@ CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
   llvm::ScalarEvolution *SE = nullptr;
   for (llvm::Loop *L : LoopInfo->getLoopsInPreorder()) {
     if (llvm::BasicBlock *Latch = L->getLoopLatch()) {
-      if (DefaultTripCount > 0U) {
+      if (DefaultTripCount > 0U && MaxTripCount > 0U) {
         unsigned TripCount = 0U;
         // Get user supplied unroll count
         llvm::Optional<unsigned> OUC =
@@ -229,7 +229,8 @@ CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
             SE = &Pass.getAnalysis<llvm::ScalarEvolutionWrapperPass>(*F).getSE();
           TripCount = SE->getSmallConstantTripCount(L);
         }
-        LoopTripCount[Latch] = (TripCount > 0U) ? TripCount : DefaultTripCount;
+        TripCount = (TripCount > 0U) ? TripCount : DefaultTripCount;
+        LoopTripCount[Latch] = (TripCount > MaxTripCount) ? MaxTripCount : TripCount;
       } else {
         // Loop unrolling disabled
         LoopTripCount[Latch] = 1U;
