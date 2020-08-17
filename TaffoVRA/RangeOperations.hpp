@@ -7,6 +7,7 @@
 #include "RangeNode.hpp"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/InstrTypes.h"
+#include "CodeInterpreter.hpp"
 
 namespace taffo {
 
@@ -37,6 +38,13 @@ range_ptr_t handleMathCallInstruction(const std::list<range_ptr_t>& ops,
 range_ptr_t handleCompare(const std::list<range_ptr_t>& ops,
                           const llvm::CmpInst::Predicate pred);
 
+/** Return true if this function call can be handled by taffo::handleOpenMPCallInstruction */
+bool isOpenMPCallInstruction(const std::string &function);
+
+/** Handle call to known OpenMP functions */
+range_ptr_t handleOpenMPCallInstruction(const std::list<range_ptr_t>& ops,
+                                      const std::string &function,
+                                      const std::shared_ptr<CodeAnalyzer>& CurAnalyzer);
 //-----------------------------------------------------------------------------
 // Arithmetic
 //-----------------------------------------------------------------------------

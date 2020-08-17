@@ -169,7 +169,8 @@ VRAnalyzer::requiresInterpretation(llvm::Instruction *I) const {
       llvm::Function *Called = CB->getCalledFunction();
       return Called && !(Called->isIntrinsic()
                          || isMathCallInstruction(Called->getName())
-                         || isMallocLike(Called));
+                         || isMallocLike(Called)
+                         || isOpenMPCallInstruction(Called->getName()));
     }
     return true;
   }
@@ -185,6 +186,31 @@ VRAnalyzer::prepareForCall(llvm::Instruction *I,
 
   LLVM_DEBUG(Logger->logInstruction(I));
   LLVM_DEBUG(Logger->logInfoln("preparing for function interpretation..."));
+
+  LLVM_DEBUG(Logger->lineHead(); llvm::dbgs() << "Loading argument ranges: ");
+  // fetch ranges of arguments
+  std::list<NodePtrT> ArgRanges;
+  for (Value *Arg : CB->args()) {
+    ArgRanges.push_back(getNode(Arg));
+
+    LLVM_DEBUG(llvm::dbgs() << VRALogger::toString(fetchRangeNode(Arg)) << ", ");
+  }
+  LLVM_DEBUG(llvm::dbgs() << "\n");
+
+  std::shared_ptr<VRAFunctionStore> FStore =
+    std::static_ptr_cast<VRAFunctionStore>(FunctionStore);
+  FStore->setArgumentRanges(*CB->getCalledFunction(), ArgRanges);
+}
+
+void
+VRAnalyzer::prepareForOpenMPCall(llvm::Instruction *I,
+std::shared_ptr<AnalysisStore> FunctionStore) {
+  //TODO change implementation if necessary as it's just a copy of prepareForCall
+  llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
+  assert(!CB->isIndirectCall());
+
+  LLVM_DEBUG(Logger->logInstruction(I));
+  LLVM_DEBUG(Logger->logInfoln("preparing for openmp function interpretation..."));
 
   LLVM_DEBUG(Logger->lineHead(); llvm::dbgs() << "Loading argument ranges: ");
   // fetch ranges of arguments
@@ -260,6 +286,19 @@ VRAnalyzer::handleSpecialCall(const llvm::Instruction* I) {
       default:
         LLVM_DEBUG(Logger->logInfoln("skipping intrinsic " + std::string(FunctionName)));
     }
+  } else if (isOpenMPCallInstruction(FunctionName)) {
+    //TODO basically a duplicate of math
+
+    // fetch ranges of arguments
+    std::list<range_ptr_t> ArgScalarRanges;
+    for (Value *Arg : CB->args()) {
+      ArgScalarRanges.push_back(fetchRange(Arg));
+    }
+    range_ptr_t Res = handleOpenMPCallInstruction(ArgScalarRanges, FunctionName, std::shared_ptr<CodeAnalyzer>(this));
+    saveValueRange(I, Res);
+
+    LLVM_DEBUG(Logger->logInfo("OpenMP whitelisted"));
+    LLVM_DEBUG(Logger->logRangeln(Res));
   }
   else {
     LLVM_DEBUG(Logger->logInfo("unsupported call"));

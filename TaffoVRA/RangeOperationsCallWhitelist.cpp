@@ -209,3 +209,26 @@ const std::map<const std::string, map_value_t> taffo::functionWhiteList =
    CMATH_WHITELIST_FUN("tanh",  &handleCallToTanh),
    CMATH_WHITELIST_FUN("rand",  &handleCallToRand)
   };
+
+static range_ptr_t
+handleCallToKmpcFork(const std::list<range_ptr_t>& operands, const std::shared_ptr<CodeAnalyzer>& CurAnalyzer) {
+  //TODO implement
+  return nullptr;
+}
+
+static range_ptr_t
+handleCallToKmpcOmpTaskAlloc(const std::list<range_ptr_t>& operands, const std::shared_ptr<CodeAnalyzer>& CurAnalyzer) {
+  //TODO implement
+  return nullptr;
+}
+static range_ptr_t
+handleCallToKmpcOmpTask(const std::list<range_ptr_t>& operands, const std::shared_ptr<CodeAnalyzer>& CurAnalyzer) {
+  //TODO implement
+  return nullptr;
+}
+const std::map<const std::string, openmp_map_value_t > taffo::OpenMPfunctionWhiteList =
+  {
+    {"__kmpc_fork_call", &handleCallToKmpcFork} ,
+    {"__kmpc_omp_task_alloc", &handleCallToKmpcOmpTaskAlloc},
+    {"__kmpc_omp_task", &handleCallToKmpcOmpTask}
+  };

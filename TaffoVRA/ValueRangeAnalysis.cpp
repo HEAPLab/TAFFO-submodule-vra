@@ -44,6 +44,8 @@ ValueRangeAnalysis::processModule(CodeInterpreter &CodeInt, Module &M) {
     if (!F.empty() && (PropagateAll || MetadataManager::isStartingPoint(F))) {
       CodeInt.interpretFunction(&F);
       FoundVisitableFunction = true;
+    //TODO remove old code
+    /*
     auto arg_it = call_i->arg_begin();
 
     // Patch function name and arguments if indirect
@@ -51,6 +53,7 @@ ValueRangeAnalysis::processModule(CodeInterpreter &CodeInt, Module &M) {
 
 	// fetch ranges of arguments
 	for(; arg_it != call_i->arg_end(); ++arg_it)
+     */
     }
   }
 

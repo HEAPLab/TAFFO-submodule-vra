@@ -35,6 +35,8 @@ public:
   bool requiresInterpretation(llvm::Instruction *I) const override;
   void prepareForCall(llvm::Instruction *I,
                       std::shared_ptr<AnalysisStore> FunctionStore) override;
+  void prepareForOpenMPCall(llvm::Instruction *I,
+    std::shared_ptr<AnalysisStore> FunctionStore) override;
   void returnFromCall(llvm::Instruction *I,
                       std::shared_ptr<AnalysisStore> FunctionStore) override;
 

@@ -205,6 +205,27 @@ CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
 }
 
 void
+CodeInterpreter::interpretOpenMPCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
+  llvm::Instruction *I) {
+  //TODO Handle differently from regular calls
+  llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
+  llvm::Function *F = CB->getCalledFunction();
+  /*if (!F || F->empty())
+    return;
+  */
+  if (!updateRecursionCount(F))
+    return;
+
+  std::shared_ptr<AnalysisStore> FunctionStore = GlobalStore->newFunctionStore(*this);
+
+  CurAnalyzer->prepareForCall(I, FunctionStore);
+  interpretFunction(F, FunctionStore);
+  CurAnalyzer->returnFromCall(I, FunctionStore);
+
+  updateLoopInfo(I->getFunction());
+}
+
+void
 CodeInterpreter::updateLoopInfo(llvm::Function *F) {
   assert(F);
   LoopInfo = &Pass.getAnalysis<llvm::LoopInfoWrapperPass>(*F).getLoopInfo();
