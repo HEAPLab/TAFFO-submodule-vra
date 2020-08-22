@@ -588,6 +588,6 @@ VRAnalyzer::setNode(const llvm::Value* V, NodePtrT Node) {
 
 void
 VRAnalyzer::logRangeln(const llvm::Value* v) {
-  LLVM_DEBUG(if (getGlobalStore()->getUserInput(v)) dbgs() << "(from metadata) ");
+  LLVM_DEBUG(if (getGlobalStore()->getUserInput(v)) dbgs() << "(possibly from metadata) ");
   LLVM_DEBUG(Logger->logRangeln(fetchRangeNode(v)));
 }

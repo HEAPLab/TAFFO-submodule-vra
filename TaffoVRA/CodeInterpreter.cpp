@@ -55,8 +55,8 @@ CodeInterpreter::interpretFunction(llvm::Function *F,
       llvm::BasicBlock *Succ = Term->getSuccessor(NS);
       if (followEdge(BB, Succ)) {
 	Worklist.push_front(Succ);
-	updateSuccessorAnalyzer(CurAnalyzer, PathLocal, Term, NS);
       }
+      updateSuccessorAnalyzer(CurAnalyzer, PathLocal, Term, NS);
     }
 
     GlobalStore->convexMerge(*CurAnalyzer);
