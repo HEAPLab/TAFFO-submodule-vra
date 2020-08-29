@@ -1,17 +1,8 @@
 #include "IndirectCallWhitelist.hpp"
 
-#include "VRAnalyzer.hpp"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/Support/Debug.h"
-#include "RangeOperations.hpp"
 #include "TypeUtils.h"
-#include "IndirectCallWhitelist.hpp"
 #include "MemSSAUtils.hpp"
-#include "VRAStore.hpp"
-#include "VRAGlobalStore.hpp"
-#include "VRAFunctionStore.hpp"
-#include "CodeInterpreter.hpp"
-#include "VRALogger.hpp"
 
 using namespace taffo;
 using namespace llvm;
@@ -19,35 +10,40 @@ using namespace llvm;
 std::string taffo::allocatedTask = std::string();
 
 /** Patch the __kmpc_fork_call for parallel and for regions in OpenMP **/
-void handleCallToKmpcFork(std::string& callee, llvm::User::const_op_iterator& arg_it, std::list<taffo::range_s_ptr_t>& arg_ranges) {
-    // Extract the function from the third argument
-    auto micro_task = llvm::dyn_cast<llvm::ConstantExpr>(arg_it + 2)->getOperand(0);
-    callee = llvm::dyn_cast<llvm::Function>(micro_task)->getName();
+llvm::Function* handleCallToKmpcFork(llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges) {
+  // Extract the function from the third argument
+  auto micro_task = llvm::dyn_cast<llvm::ConstantExpr>(arg_it + 2)->getOperand(0);
+  auto micro_task_function = llvm::dyn_cast<llvm::Function>(micro_task);
 
-    // Add empty ranges to account for internal OpenMP parameters
-    arg_ranges.push_back(nullptr);
-    arg_ranges.push_back(nullptr);
+  // Add empty ranges to account for internal OpenMP parameters
+  arg_ranges.push_back(nullptr);
+  arg_ranges.push_back(nullptr);
 
-    // Skip already analyzed arguments
-    arg_it += 3;
+  // Skip already analyzed arguments
+  arg_it += 3;
+
+  return micro_task_function;
 }
 
 /** Patch the __kmpc_task_call replacing it with the associated task function **/
-void handleCallToKmpcOmpTask(std::string& callee, llvm::User::const_op_iterator& arg_it, std::list<taffo::range_s_ptr_t>& arg_ranges) {
-    callee = allocatedTask;
-
-    // Add empty range for the first i32 argument of the task_entry function
+llvm::Function* handleCallToKmpcOmpTask(llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges) {
+  // TODO change behaviour with the new scheduler
+  // Add empty range for the first i32 argument of the task_entry function
     arg_ranges.push_back(nullptr);
 
     // Ignore internal OpenMP LLVM implementation arguments
     arg_it += 2;
+
+    return nullptr;
 }
 
 /** Save the name of the function that will be executed as a task **/
-void handleCallToKmpcOmpTaskAlloc(std::string& callee, llvm::User::const_op_iterator& arg_it, std::list<taffo::range_s_ptr_t>& arg_ranges) {
-    // Extract the function from the kmp_routine_entry_t argument
-    auto routineEntry = llvm::dyn_cast<llvm::ConstantExpr>(arg_it+5)->getOperand(0);
-    allocatedTask = routineEntry->getName();
+llvm::Function* handleCallToKmpcOmpTaskAlloc(llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges) {
+  // TODO change behaviour with the new scheduler
+  // Extract the function from the kmp_routine_entry_t argument
+  auto routineEntry = llvm::dyn_cast<llvm::ConstantExpr>(arg_it+5)->getOperand(0);
+  allocatedTask = routineEntry->getName();
+
 }
 
 const std::map<const std::string, handler_function> taffo::indirectCallFunctions = {
@@ -56,10 +52,14 @@ const std::map<const std::string, handler_function> taffo::indirectCallFunctions
         {"__kmpc_omp_task", &handleCallToKmpcOmpTask}
 };
 
-void taffo::handleIndirectCall(std::string& callee, llvm::User::const_op_iterator& arg_it, std::list<taffo::range_s_ptr_t>& arg_ranges) {
+llvm::Function* taffo::handleIndirectCall(std::string& callee, llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges) {
     auto it = indirectCallFunctions.find(callee);
     if (it != indirectCallFunctions.end()) {
-        it->second(callee, arg_it, arg_ranges);
+        return it->second(arg_it, arg_ranges);
     }
+}
+
+bool taffo::isIndirectFunction(llvm::Function *Function) {
+  return indirectCallFunctions.count(Function->getName());
 }
 

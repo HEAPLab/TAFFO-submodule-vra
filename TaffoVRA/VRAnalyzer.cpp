@@ -202,43 +202,29 @@ VRAnalyzer::prepareForCall(llvm::Instruction *I,
   FStore->setArgumentRanges(*CB->getCalledFunction(), ArgRanges);
 }
 
-/** Patch the __kmpc_fork_call for parallel and for regions in OpenMP **/
-void handleCallToKmpcForkk(std::string& callee, llvm::User::const_op_iterator& arg_it, std::list<taffo::range_s_ptr_t>& arg_ranges) {
-  // Extract the function from the third argument
-  auto micro_task = llvm::dyn_cast<llvm::ConstantExpr>(arg_it + 2)->getOperand(0);
-  callee = llvm::dyn_cast<llvm::Function>(micro_task)->getName();
-
-  // Add empty ranges to account for internal OpenMP parameters
-  arg_ranges.push_back(nullptr);
-  arg_ranges.push_back(nullptr);
-
-  // Skip already analyzed arguments
-  arg_it += 3;
-}
-
 llvm::Function*
-VRAnalyzer::prepareForOpenMPCall(llvm::Instruction *I,
+VRAnalyzer::prepareForIndirectCall(llvm::Instruction *I,
 std::shared_ptr<AnalysisStore> FunctionStore) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
+  llvm::Function* IndirectFunction = CB->getCalledFunction();
+  std::string caller = IndirectFunction->getName();
 
   LLVM_DEBUG(Logger->logInstruction(I));
-  LLVM_DEBUG(Logger->logInfoln("preparing for openmp function interpretation..."));
+  LLVM_DEBUG(Logger->logInfoln("preparing for indirect function interpretation..."));
 
-  LLVM_DEBUG(Logger->lineHead(); llvm::dbgs() << "Shifting argument ranges: ");
-  // fetch ranges of arguments
   llvm::User::op_iterator arg_it = CB->arg_begin();
-  auto micro_task = llvm::dyn_cast<llvm::ConstantExpr>(arg_it + 2)->getOperand(0);
-  auto MicroTaskFunction = llvm::dyn_cast<llvm::Function>(micro_task);
-
   std::list<NodePtrT> ArgRanges;
-  // Add empty ranges to account for internal OpenMP parameters
-  ArgRanges.push_back(nullptr);
-  ArgRanges.push_back(nullptr);
-  // Skip already analyzed arguments
-  arg_it += 3;
+  std::list<NodePtrT> IndirectArgRanges;
 
-  for (auto arg = arg_it; arg != CB->arg_end(); arg +=1 ) {
+
+  llvm::Function* FunctionToInterpret = handleIndirectCall(caller, arg_it, ArgRanges);
+
+  for (auto arg = CB->arg_begin(); arg != arg_it; arg += 1)
+    IndirectArgRanges.push_back(getNode(*arg));
+
+  for (auto arg = arg_it; arg != CB->arg_end(); arg += 1) {
     ArgRanges.push_back(getNode(*arg));
+    IndirectArgRanges.push_back(getNode(*arg));
 
     LLVM_DEBUG(llvm::dbgs() << VRALogger::toString(fetchRangeNode(*arg)) << ", ");
   }
@@ -246,8 +232,9 @@ std::shared_ptr<AnalysisStore> FunctionStore) {
 
   std::shared_ptr<VRAFunctionStore> FStore =
     std::static_ptr_cast<VRAFunctionStore>(FunctionStore);
-  FStore->setArgumentRanges(*MicroTaskFunction, ArgRanges);
-  return MicroTaskFunction;
+  FStore->setArgumentRanges(*FunctionToInterpret, ArgRanges);
+
+  return FunctionToInterpret;
 }
 
 void

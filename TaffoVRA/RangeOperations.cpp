@@ -605,19 +605,3 @@ taffo::fillRangeHoles(const RangeNodePtrT src,
   }
   return std::make_shared<VRAStructNode>(new_fields);
 }
-
-bool
-taffo::isOpenMPCallInstruction(const std::string& function)
-{
-  return OpenMPfunctionWhiteList.count(function);
-}
-
-/** Handle call to known OpenMP functions. Return nullptr if unknown */
-range_ptr_t
-taffo::handleOpenMPCallInstruction(const std::list<range_ptr_t>& ops, const std::string& function, const std::shared_ptr<CodeAnalyzer>& CurAnalyzer) {
-  const auto it = OpenMPfunctionWhiteList.find(function);
-  if (it != OpenMPfunctionWhiteList.end()) {
-    return it->second(ops, CurAnalyzer);
-  }
-  return nullptr;
-}
