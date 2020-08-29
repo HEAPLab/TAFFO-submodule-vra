@@ -219,12 +219,8 @@ std::shared_ptr<AnalysisStore> FunctionStore) {
 
   llvm::Function* FunctionToInterpret = handleIndirectCall(caller, arg_it, ArgRanges);
 
-  for (auto arg = CB->arg_begin(); arg != arg_it; arg += 1)
-    IndirectArgRanges.push_back(getNode(*arg));
-
   for (auto arg = arg_it; arg != CB->arg_end(); arg += 1) {
     ArgRanges.push_back(getNode(*arg));
-    IndirectArgRanges.push_back(getNode(*arg));
 
     LLVM_DEBUG(llvm::dbgs() << VRALogger::toString(fetchRangeNode(*arg)) << ", ");
   }

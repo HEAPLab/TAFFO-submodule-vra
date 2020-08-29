@@ -191,7 +191,7 @@ CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
                                llvm::Instruction *I) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   llvm::Function *F = CB->getCalledFunction();
-  if (!F || F->empty() && isIndirectFunction(F))
+  if (!F || F->empty() && !isIndirectFunction(F))
     return;
 
   if (!updateRecursionCount(F))

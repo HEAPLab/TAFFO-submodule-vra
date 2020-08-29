@@ -53,10 +53,7 @@ const std::map<const std::string, handler_function> taffo::indirectCallFunctions
 };
 
 llvm::Function* taffo::handleIndirectCall(std::string& callee, llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges) {
-    auto it = indirectCallFunctions.find(callee);
-    if (it != indirectCallFunctions.end()) {
-        return it->second(arg_it, arg_ranges);
-    }
+    return indirectCallFunctions.find(callee)->second(arg_it, arg_ranges);
 }
 
 bool taffo::isIndirectFunction(llvm::Function *Function) {
