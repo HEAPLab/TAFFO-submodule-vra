@@ -59,7 +59,7 @@ public:
   virtual bool requiresInterpretation(llvm::Instruction *I) const = 0;
   virtual void prepareForCall(llvm::Instruction *I,
                               std::shared_ptr<AnalysisStore> FunctionStore) = 0;
-  virtual void prepareForOpenMPCall(llvm::Instruction *I,
+  virtual llvm::Function* prepareForOpenMPCall(llvm::Instruction *I,
                               std::shared_ptr<AnalysisStore> FunctionStore) = 0;
   virtual void returnFromCall(llvm::Instruction *I,
                               std::shared_ptr<AnalysisStore> FunctionStore) = 0;

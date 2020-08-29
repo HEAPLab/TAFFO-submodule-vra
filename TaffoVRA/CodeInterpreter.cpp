@@ -1,4 +1,5 @@
 #include "CodeInterpreter.hpp"
+#include "RangeOperations.hpp"
 
 #include <cassert>
 #include <deque>
@@ -189,11 +190,16 @@ CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
                                llvm::Instruction *I) {
   llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
   llvm::Function *F = CB->getCalledFunction();
-  if (!F || F->empty())
+  if (!F || F->empty() && F->getName() != "__kmpc_fork_call")
     return;
 
   if (!updateRecursionCount(F))
     return;
+
+  if (F->getName() == "__kmpc_fork_call") {
+    interpretOpenMPCall(CurAnalyzer, I);
+    return;
+  }
 
   std::shared_ptr<AnalysisStore> FunctionStore = GlobalStore->newFunctionStore(*this);
 
@@ -207,22 +213,15 @@ CodeInterpreter::interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
 void
 CodeInterpreter::interpretOpenMPCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
   llvm::Instruction *I) {
-  //TODO Handle differently from regular calls
-  llvm::CallBase *CB = llvm::cast<llvm::CallBase>(I);
-  llvm::Function *F = CB->getCalledFunction();
-  /*if (!F || F->empty())
-    return;
-  */
-  if (!updateRecursionCount(F))
-    return;
+  llvm::Function *OpenMPIndirectFunction = llvm::cast<llvm::CallBase>(I)->getCalledFunction();
 
   std::shared_ptr<AnalysisStore> FunctionStore = GlobalStore->newFunctionStore(*this);
 
-  CurAnalyzer->prepareForCall(I, FunctionStore);
-  interpretFunction(F, FunctionStore);
+  llvm::Function *OpenMPTask = CurAnalyzer->prepareForOpenMPCall(I, FunctionStore);
+  interpretFunction(OpenMPTask, FunctionStore);
   CurAnalyzer->returnFromCall(I, FunctionStore);
 
-  updateLoopInfo(I->getFunction());
+  updateLoopInfo(OpenMPTask);
 }
 
 void

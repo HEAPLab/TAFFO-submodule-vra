@@ -1,6 +1,20 @@
 #include "IndirectCallWhitelist.hpp"
 
+#include "VRAnalyzer.hpp"
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/Support/Debug.h"
+#include "RangeOperations.hpp"
+#include "TypeUtils.h"
+#include "IndirectCallWhitelist.hpp"
+#include "MemSSAUtils.hpp"
+#include "VRAStore.hpp"
+#include "VRAGlobalStore.hpp"
+#include "VRAFunctionStore.hpp"
+#include "CodeInterpreter.hpp"
+#include "VRALogger.hpp"
+
 using namespace taffo;
+using namespace llvm;
 
 std::string taffo::allocatedTask = std::string();
 
