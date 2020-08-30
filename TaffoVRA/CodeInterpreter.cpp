@@ -217,6 +217,10 @@ CodeInterpreter::interpretIndirectCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer
   std::shared_ptr<AnalysisStore> FunctionStore = GlobalStore->newFunctionStore(*this);
 
   llvm::Function *FunctionToInterpret = CurAnalyzer->prepareForIndirectCall(I, FunctionStore);
+
+  if (!FunctionToInterpret || FunctionToInterpret->empty())
+    return;
+
   interpretFunction(FunctionToInterpret, FunctionStore);
   CurAnalyzer->returnFromCall(I, FunctionStore);
 

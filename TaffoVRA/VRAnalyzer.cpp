@@ -218,9 +218,8 @@ std::shared_ptr<AnalysisStore> FunctionStore) {
 
 
   llvm::Function* FunctionToInterpret = handleIndirectCall(caller, arg_it, ArgRanges);
-
-  for (auto arg = CB->arg_begin(); arg != arg_it; arg += 1)
-    IndirectArgRanges.push_back(getNode(*arg));
+  if (!FunctionToInterpret)
+    return nullptr;
 
   for (auto arg = arg_it; arg != CB->arg_end(); arg += 1) {
     ArgRanges.push_back(getNode(*arg));
@@ -233,7 +232,6 @@ std::shared_ptr<AnalysisStore> FunctionStore) {
     std::static_ptr_cast<VRAFunctionStore>(FunctionStore);
 
   FStore->setArgumentRanges(*FunctionToInterpret, ArgRanges);
-  FStore->setArgumentRanges(*IndirectFunction, IndirectArgRanges);
 
   return FunctionToInterpret;
 }

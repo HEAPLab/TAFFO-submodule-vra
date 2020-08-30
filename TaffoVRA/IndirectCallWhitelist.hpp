@@ -13,7 +13,7 @@ namespace taffo {
     extern const std::map<const std::string, handler_function> indirectCallFunctions;
 
     /** Latest allocated task name **/
-    extern std::string allocatedTask;
+    extern llvm::Function* allocatedTask;
 
     /** Patch the function name and arguments with the handler **/
     llvm::Function* handleIndirectCall(std::string& callee, llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges);

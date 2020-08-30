@@ -7,7 +7,7 @@
 using namespace taffo;
 using namespace llvm;
 
-std::string taffo::allocatedTask = std::string();
+llvm::Function* taffo::allocatedTask;
 
 /** Patch the __kmpc_fork_call for parallel and for regions in OpenMP **/
 llvm::Function* handleCallToKmpcFork(llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges) {
@@ -29,21 +29,22 @@ llvm::Function* handleCallToKmpcFork(llvm::User::op_iterator& arg_it, std::list<
 llvm::Function* handleCallToKmpcOmpTask(llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges) {
   // TODO change behaviour with the new scheduler
   // Add empty range for the first i32 argument of the task_entry function
-    arg_ranges.push_back(nullptr);
+  arg_ranges.push_back(nullptr);
 
-    // Ignore internal OpenMP LLVM implementation arguments
-    arg_it += 2;
+  // Ignore internal OpenMP LLVM implementation arguments
+  arg_it += 2;
 
-    return nullptr;
+  return allocatedTask;
 }
 
 /** Save the name of the function that will be executed as a task **/
 llvm::Function* handleCallToKmpcOmpTaskAlloc(llvm::User::op_iterator& arg_it, std::list<taffo::NodePtrT>& arg_ranges) {
-  // TODO change behaviour with the new scheduler
   // Extract the function from the kmp_routine_entry_t argument
   auto routineEntry = llvm::dyn_cast<llvm::ConstantExpr>(arg_it+5)->getOperand(0);
-  allocatedTask = routineEntry->getName();
+  auto routineEntryFunction = llvm::dyn_cast<llvm::Function>(routineEntry);
 
+  allocatedTask = routineEntryFunction;
+  return nullptr;
 }
 
 const std::map<const std::string, handler_function> taffo::indirectCallFunctions = {
