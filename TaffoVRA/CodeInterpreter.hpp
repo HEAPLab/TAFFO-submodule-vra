@@ -121,7 +121,6 @@ private:
   llvm::Loop *getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
   bool followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst);
   void updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAnalyzer,
-                               std::shared_ptr<CodeAnalyzer> PathLocal,
                                llvm::Instruction *TermInstr, unsigned SuccIdx);
   void interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
 		     llvm::Instruction *I);
