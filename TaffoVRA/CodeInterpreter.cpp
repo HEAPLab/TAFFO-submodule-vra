@@ -151,8 +151,8 @@ CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
       EvalCount[Dst] = 1U;
       return true;
     }
-    // The loop has to be evaluated more times: we do not follow the exiting edges.
-    return SrcLoop->contains(Dst);
+    // If the loop has to be evaluated more times, we do not follow the exiting edges.
+    return EvalCount[Dst] > 0 && SrcLoop->contains(Dst);
   }
   if (!SrcLoop && !DstLoop) {
     // There's no loop, just evaluate Dst once.
