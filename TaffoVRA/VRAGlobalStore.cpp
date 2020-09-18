@@ -522,7 +522,7 @@ VRAGlobalStore::fetchConstant(const llvm::Constant* kval) {
       if (gvar_i->hasInitializer()) {
         const llvm::Constant* init_val = gvar_i->getInitializer();
         if (init_val) {
-          return fetchConstant(init_val);
+          return std::make_shared<VRAPtrNode>(fetchConstant(init_val));
         }
       }
       LLVM_DEBUG(Logger->logInfo("Could not derive range from a Global Variable"));

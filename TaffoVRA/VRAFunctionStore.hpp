@@ -26,8 +26,8 @@ public:
   }
 
   // Function handling stuff
-  RangeNodePtrT getRetVal() const { return ReturnValue; }
-  void setRetVal(RangeNodePtrT RetVal);
+  NodePtrT getRetVal() const { return ReturnValue; }
+  void setRetVal(NodePtrT RetVal);
   void setArgumentRanges(const llvm::Function &F,
                          const std::list<NodePtrT> &AARanges);
 
@@ -40,7 +40,7 @@ public:
   }
 
 protected:
-  RangeNodePtrT ReturnValue;
+  NodePtrT ReturnValue;
 };
 
 } // end namespace taffo

@@ -211,13 +211,15 @@ VRAnalyzer::returnFromCall(llvm::Instruction *I,
 
   std::shared_ptr<VRAFunctionStore> FStore =
     std::static_ptr_cast<VRAFunctionStore>(FunctionStore);
-  // TODO: support returning pointers
-  RangeNodePtrT Ret = std::dynamic_ptr_cast_or_null<VRARangeNode>(FStore->getRetVal());
-  if (Ret) {
-    saveValueRange(I, Ret);
+  NodePtrT Ret = FStore->getRetVal();
+  if (!Ret) {
+    LLVM_DEBUG(Logger->logInfoln("function returns nothing"));
+  } else if (RangeNodePtrT RetRange = std::dynamic_ptr_cast_or_null<VRARangeNode>(Ret)) {
+    saveValueRange(I, RetRange);
     LLVM_DEBUG(logRangeln(I));
   } else {
-    LLVM_DEBUG(Logger->logInfoln("function returns nothing"));
+    setNode(I, Ret);
+    LLVM_DEBUG(Logger->logRangeln(Ret));
   }
 }
 
@@ -330,7 +332,11 @@ VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
   LLVM_DEBUG(Logger->logInstruction(ret));
   if (const llvm::Value* ret_val = ret_i->getReturnValue()) {
     const llvm::Function* ret_fun = ret_i->getFunction();
-    RangeNodePtrT range = fetchRangeNode(ret_val);
+    NodePtrT range = fetchRangeNode(ret_val);
+    if (!range) {
+      // Maybe it is a pointer...
+      range = getNode(ret_val);
+    }
 
     std::shared_ptr<VRAFunctionStore> FStore =
       std::static_ptr_cast<VRAFunctionStore>(CodeInt.getFunctionStore());

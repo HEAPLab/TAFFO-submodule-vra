@@ -60,6 +60,9 @@ taffo::handleBinaryInstruction(const range_ptr_t &op1,
 range_ptr_t
 taffo::handleUnaryInstruction(const range_ptr_t &op,
                               const unsigned OpCode) {
+  if (!op)
+    return nullptr;
+
   switch (OpCode) {
     case llvm::Instruction::FNeg:
       return make_range(-op->max(), -op->min());

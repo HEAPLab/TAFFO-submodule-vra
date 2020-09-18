@@ -29,8 +29,13 @@ VRAFunctionStore::newFunctionStore(CodeInterpreter &CI) {
 }
 
 void
-VRAFunctionStore::setRetVal(RangeNodePtrT RetVal) {
-  ReturnValue = getUnionRange(ReturnValue, RetVal);
+VRAFunctionStore::setRetVal(NodePtrT RetVal) {
+  if (RangeNodePtrT RetRange = std::dynamic_ptr_cast<VRARangeNode>(RetVal)) {
+    RangeNodePtrT ReturnRange = std::dynamic_ptr_cast_or_null<VRARangeNode>(ReturnValue);
+    ReturnValue = getUnionRange(ReturnRange, RetRange);
+  } else {
+    ReturnValue = RetVal;
+  }
 }
 
 void
