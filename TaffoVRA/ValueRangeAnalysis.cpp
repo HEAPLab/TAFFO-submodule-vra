@@ -22,7 +22,7 @@ ValueRangeAnalysis::runOnModule(Module &M) {
   std::shared_ptr<VRAGlobalStore> GlobalStore = std::make_shared<VRAGlobalStore>();
   GlobalStore->harvestMetadata(M);
 
-  CodeInterpreter CodeInt(*this, GlobalStore, Unroll);
+  CodeInterpreter CodeInt(*this, GlobalStore, Unroll, MaxUnroll);
   processModule(CodeInt, M);
 
   GlobalStore->saveResults(M);
@@ -44,16 +44,6 @@ ValueRangeAnalysis::processModule(CodeInterpreter &CodeInt, Module &M) {
     if (!F.empty() && (PropagateAll || MetadataManager::isStartingPoint(F))) {
       CodeInt.interpretFunction(&F);
       FoundVisitableFunction = true;
-    //TODO remove old code
-    /*
-    auto arg_it = call_i->arg_begin();
-
-    // Patch function name and arguments if indirect
-    handleIndirectCall(calledFunctionName, arg_it, arg_ranges);
-
-	// fetch ranges of arguments
-	for(; arg_it != call_i->arg_end(); ++arg_it)
-     */
     }
   }
 

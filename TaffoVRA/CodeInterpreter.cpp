@@ -38,7 +38,6 @@ CodeInterpreter::interpretFunction(llvm::Function *F,
     auto CAIt = Scopes.back().BBAnalyzers.find(BB);
     assert(CAIt != Scopes.back().BBAnalyzers.end());
     std::shared_ptr<CodeAnalyzer> CurAnalyzer = CAIt->second;
-    std::shared_ptr<CodeAnalyzer> PathLocal = CurAnalyzer->clone();
 
     DEBUG_WITH_TYPE(GlobalStore->getLogger()->getDebugType(),
                     GlobalStore->getLogger()->logBasicBlock(BB));
@@ -57,8 +56,9 @@ CodeInterpreter::interpretFunction(llvm::Function *F,
       llvm::BasicBlock *Succ = Term->getSuccessor(NS);
       if (followEdge(BB, Succ)) {
 	Worklist.push_front(Succ);
-	updateSuccessorAnalyzer(CurAnalyzer, PathLocal, Term, NS);
       }
+      // TODO: only propagate pathlocal info for better efficiency.
+      updateSuccessorAnalyzer(CurAnalyzer, Term, NS);
     }
 
     GlobalStore->convexMerge(*CurAnalyzer);
@@ -153,8 +153,8 @@ CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
       EvalCount[Dst] = 1U;
       return true;
     }
-    // The loop has to be evaluated more times: we do not follow the exiting edges.
-    return SrcLoop->contains(Dst);
+    // If the loop has to be evaluated more times, we do not follow the exiting edges.
+    return EvalCount[Dst] > 0 && SrcLoop->contains(Dst);
   }
   if (!SrcLoop && !DstLoop) {
     // There's no loop, just evaluate Dst once.
@@ -165,7 +165,6 @@ CodeInterpreter::followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) {
 
 void
 CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAnalyzer,
-                                         std::shared_ptr<CodeAnalyzer> PathLocal,
                                          llvm::Instruction *TermInstr,
                                          unsigned SuccIdx) {
   llvm::DenseMap<llvm::BasicBlock *, std::shared_ptr<CodeAnalyzer>> &BBAnalyzers =
@@ -175,12 +174,12 @@ CodeInterpreter::updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAn
   std::shared_ptr<CodeAnalyzer> SuccAnalyzer;
   auto SAIt = BBAnalyzers.find(SuccBB);
   if (SAIt == BBAnalyzers.end()) {
-    SuccAnalyzer = (SuccIdx < TermInstr->getNumSuccessors()) ? PathLocal->clone() : PathLocal;
+    SuccAnalyzer = CurrentAnalyzer->clone();
     BBAnalyzers[SuccBB] = SuccAnalyzer;
   }
   else {
     SuccAnalyzer = SAIt->second;
-    SuccAnalyzer->convexMerge(*PathLocal);
+    SuccAnalyzer->convexMerge(*CurrentAnalyzer);
   }
 
   CurrentAnalyzer->setPathLocalInfo(SuccAnalyzer, TermInstr, SuccIdx);
@@ -239,7 +238,7 @@ CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
   llvm::ScalarEvolution *SE = nullptr;
   for (llvm::Loop *L : LoopInfo->getLoopsInPreorder()) {
     if (llvm::BasicBlock *Latch = L->getLoopLatch()) {
-      if (DefaultTripCount > 0U) {
+      if (DefaultTripCount > 0U && MaxTripCount > 0U) {
         unsigned TripCount = 0U;
         // Get user supplied unroll count
         llvm::Optional<unsigned> OUC =
@@ -252,7 +251,8 @@ CodeInterpreter::retrieveLoopTripCount(llvm::Function *F) {
             SE = &Pass.getAnalysis<llvm::ScalarEvolutionWrapperPass>(*F).getSE();
           TripCount = SE->getSmallConstantTripCount(L);
         }
-        LoopTripCount[Latch] = (TripCount > 0U) ? TripCount : DefaultTripCount;
+        TripCount = (TripCount > 0U) ? TripCount : DefaultTripCount;
+        LoopTripCount[Latch] = (TripCount > MaxTripCount) ? MaxTripCount : TripCount;
       } else {
         // Loop unrolling disabled
         LoopTripCount[Latch] = 1U;

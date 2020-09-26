@@ -85,10 +85,11 @@ struct FunctionScope {
 class CodeInterpreter {
 public:
   CodeInterpreter(llvm::Pass &P, std::shared_ptr<AnalysisStore> GlobalStore,
-                  unsigned LoopUnrollCount = 1U)
+                  unsigned LoopUnrollCount = 1U, unsigned LoopMaxUnrollCount = 256U)
     : GlobalStore(GlobalStore), Scopes(),
       Pass(P), LoopInfo(nullptr), LoopTripCount(), RecursionCount(),
-      DefaultTripCount(LoopUnrollCount) {}
+      DefaultTripCount(LoopUnrollCount),
+      MaxTripCount(LoopMaxUnrollCount) {}
 
   void interpretFunction(llvm::Function *F,
                          std::shared_ptr<AnalysisStore> FunctionStore = nullptr);
@@ -115,13 +116,13 @@ protected:
   llvm::DenseMap<llvm::BasicBlock *, unsigned> LoopTripCount;
   llvm::DenseMap<llvm::Function *, unsigned> RecursionCount;
   unsigned DefaultTripCount;
+  unsigned MaxTripCount;
 
 private:
   bool isLoopBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
   llvm::Loop *getLoopForBackEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst) const;
   bool followEdge(llvm::BasicBlock *Src, llvm::BasicBlock *Dst);
   void updateSuccessorAnalyzer(std::shared_ptr<CodeAnalyzer> CurrentAnalyzer,
-                               std::shared_ptr<CodeAnalyzer> PathLocal,
                                llvm::Instruction *TermInstr, unsigned SuccIdx);
   void interpretCall(std::shared_ptr<CodeAnalyzer> CurAnalyzer,
 		     llvm::Instruction *I);
