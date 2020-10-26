@@ -1,4 +1,6 @@
-add_llvm_library(TaffoVRA OBJECT BUILDTREE_ONLY
+set(SELF TaffoVRA)
+
+add_llvm_library(${SELF} OBJECT BUILDTREE_ONLY
   RangeOperationsCallWhitelist.cpp
   RangeOperations.cpp
   ValueRangeAnalysis.cpp
@@ -24,5 +26,7 @@ add_llvm_library(TaffoVRA OBJECT BUILDTREE_ONLY
   VRAFunctionStore.hpp
   VRALogger.hpp
 )
-
-set_property(TARGET obj.TaffoVRA PROPERTY POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(obj.${SELF} PUBLIC
+  TaffoUtils
+  )
+set_property(TARGET obj.${SELF} PROPERTY POSITION_INDEPENDENT_CODE ON)
