@@ -393,23 +393,19 @@ VRAGlobalStore::getNode(const llvm::Value* v) {
 
 const RangeNodePtrT
 VRAGlobalStore::fetchRangeNode(const llvm::Value* V) {
-  if (const RangeNodePtrT Derived = VRAStore::fetchRangeNode(V)) {
-    if (std::isa_ptr<VRAStructNode>(Derived)) {
-      if (RangeNodePtrT InputRange = getUserInput(V)) {
-        // fill null input_range fields with corresponding derived fields
-        return fillRangeHoles(Derived, InputRange);
-      }
-    }
-    return Derived;
-  }
+  const RangeNodePtrT Derived = VRAStore::fetchRangeNode(V);
 
   if (const RangeNodePtrT InputRange = getUserInput(V)) {
-    // Save it in this store, so we don't overwrite it if it's final.
-    saveValueRange(V, InputRange);
-    return InputRange;
+    if (Derived && std::isa_ptr<VRAStructNode>(Derived)) {
+      return fillRangeHoles(Derived, InputRange);
+    }
+    const auto ScalarInput = std::dynamic_ptr_cast<VRAScalarNode>(InputRange);
+    if (ScalarInput && ScalarInput->isFinal()) {
+      return InputRange;
+    }
   }
 
-  return nullptr;
+  return Derived;
 }
 
 RangeNodePtrT
