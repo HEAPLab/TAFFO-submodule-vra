@@ -304,13 +304,19 @@ taffo::handleDiv(const range_ptr_t &op1, const range_ptr_t &op2) {
   if (!op1 || !op2) {
     return nullptr;
   }
+  num_t op2_min, op2_max;
   // Avoid division by 0
-  num_t op2_min = (op2->min() == 0.0 && op2->max() > 0.0)
-    ? 1.0 // std::nextafter(static_cast<num_t>(0.0), static_cast<num_t>(op2->max()))
-    : op2->min();
-  num_t op2_max = (op2->max() == 0.0 && op2->min() < 0.0)
-    ? -1.0 // std::nextafter(static_cast<num_t>(0.0), static_cast<num_t>(op2->min()))
-    : op2->max();
+#define DIV_EPS (static_cast<num_t>(1e-8))
+  if (op2->max() <= 0) {
+    op2_min = std::min(op2->min(), -DIV_EPS);
+    op2_max = std::min(op2->max(), -DIV_EPS);
+  } else if (op2->min() < 0) {
+    op2_min = -DIV_EPS;
+    op2_max = +DIV_EPS;
+  } else {
+    op2_min = std::max(op2->min(), +DIV_EPS);
+    op2_max = std::max(op2->max(), +DIV_EPS);
+  }
   num_t a = op1->min() / op2_min;
   num_t b = op1->max() / op2_max;
   num_t c = op1->min() / op2_max;
