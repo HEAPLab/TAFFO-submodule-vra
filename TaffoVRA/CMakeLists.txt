@@ -1,25 +1,28 @@
-add_llvm_library(TaffoVRA MODULE
+add_llvm_library(TaffoVRA OBJECT BUILDTREE_ONLY
   RangeOperationsCallWhitelist.cpp
-  RangeOperationsCallWhitelist.hpp
   RangeOperations.cpp
+  ValueRangeAnalysis.cpp
+  MemSSAUtils.cpp
+  CodeInterpreter.cpp
+  VRAStore.cpp
+  VRAnalyzer.cpp
+  VRAGlobalStore.cpp
+  VRAFunctionStore.cpp
+
+  ADDITIONAL_HEADERS
+  PtrCasts.hpp
+  RangeOperationsCallWhitelist.hpp
   RangeOperations.hpp
   Range.hpp
   RangeNode.hpp
-  ValueRangeAnalysis.cpp
   ValueRangeAnalysis.hpp
-  MemSSAUtils.cpp
   MemSSAUtils.hpp
-
-  PLUGIN_TOOL
-  opt
+  CodeInterpreter.hpp
+  VRAStore.hpp
+  VRAnalyzer.hpp
+  VRAGlobalStore.hpp
+  VRAFunctionStore.hpp
+  VRALogger.hpp
 )
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set_property(TARGET TaffoVRA APPEND_STRING PROPERTY
-    LINK_FLAGS " -undefined dynamic_lookup")
-endif()
-
-set_property(TARGET TaffoVRA PROPERTY CXX_STANDARD 11)
-set_property(TARGET TaffoVRA PROPERTY CXX_STANDARD_REQUIRED ON)
-
-target_link_libraries(TaffoVRA TaffoUtils m stdc++)
+set_property(TARGET obj.TaffoVRA PROPERTY POSITION_INDEPENDENT_CODE ON)

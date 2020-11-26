@@ -10,11 +10,11 @@
 namespace taffo {
 
 #define CMATH_WHITELIST_FUN(BASE_NAME, POINTER) \
-	{BASE_NAME,                POINTER}, \
-	{BASE_NAME "f",            POINTER}, \
-	{BASE_NAME "l",            POINTER}, \
-	{"llvm." BASE_NAME ".f32", POINTER}, \
-	{"llvm." BASE_NAME ".f64", POINTER}
+        {BASE_NAME,                POINTER}, \
+        {BASE_NAME "f",            POINTER}, \
+        {BASE_NAME "l",            POINTER}, \
+        {"llvm." BASE_NAME ".f32", POINTER}, \
+        {"llvm." BASE_NAME ".f64", POINTER}
 
 #define LIBM_STUB_REGEX_TAIL "(\\.[0-9]+)+"
 #define LIBM_STUB_REGEX(BASE_NAME) \
