@@ -62,6 +62,8 @@ VRAGlobalStore::harvestMetadata(Module &M) {
       NodePtrT Const = fetchConstant(&v);
       if (Const && Const->getKind() == VRANode::VRAScalarNodeK)
         DerivedRanges[&v] = std::make_shared<VRAPtrNode>(Const);
+      else if (Const && Const->getKind() == VRANode::VRAPtrNodeK)
+        DerivedRanges[&v] = Const;
       else
         DerivedRanges[&v] = std::make_shared<VRAPtrNode>();
     }
