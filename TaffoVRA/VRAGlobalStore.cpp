@@ -146,9 +146,11 @@ VRAGlobalStore::harvestMetadata(Module &M) {
                                  make_range(II->IRange->Min, II->IRange->Max, II->isFinal()));
           }
         } else if (StructInfo *SI = dyn_cast<StructInfo>(MDI)) {
-          const llvm::Value* i_ptr = &i;
-          UserInput[i_ptr] = std::static_ptr_cast<VRARangeNode>(
-                               harvestStructMD(SI, fullyUnwrapPointerOrArrayType(i_ptr->getType())));
+          if (!i.getType()->isVoidTy()) {
+            const llvm::Value* i_ptr = &i;
+            UserInput[i_ptr] = std::static_ptr_cast<VRARangeNode>(
+              harvestStructMD(SI, fullyUnwrapPointerOrArrayType(i_ptr->getType())));
+          }
         }
       }
     }
