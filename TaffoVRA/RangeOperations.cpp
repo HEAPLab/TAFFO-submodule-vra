@@ -507,11 +507,15 @@ taffo::copyRange(const RangeNodePtrT op) {
   unsigned num_fields = op_s->getNumFields();
   new_fields.reserve(num_fields);
   for (unsigned i = 0; i < num_fields; ++i) {
-    if (const std::shared_ptr<VRAPtrNode> ptr_field =
-        std::dynamic_ptr_cast_or_null<VRAPtrNode>(op_s->getNodeAt(i))) {
-      new_fields.push_back(std::make_shared<VRAPtrNode>(ptr_field->getParent()));
+    if (const NodePtrT field = op_s->getNodeAt(i)) {
+      if (const std::shared_ptr<VRAPtrNode> ptr_field =
+          std::dynamic_ptr_cast_or_null<VRAPtrNode>(field)) {
+        new_fields.push_back(std::make_shared<VRAPtrNode>(ptr_field->getParent()));
+      } else {
+        new_fields.push_back(copyRange(std::static_ptr_cast<VRARangeNode>(field)));
+      }
     } else {
-      new_fields.push_back(copyRange(std::static_ptr_cast<VRARangeNode>(op_s->getNodeAt(i))));
+      new_fields.push_back(nullptr);
     }
   }
   return std::make_shared<VRAStructNode>(new_fields);

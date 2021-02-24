@@ -299,8 +299,11 @@ VRAGlobalStore::updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
   if (const std::shared_ptr<VRAScalarNode> Scalar =
       std::dynamic_ptr_cast<VRAScalarNode>(r)) {
     if (range_ptr_t SRange = Scalar->getRange()) {
-      std::shared_ptr<InputInfo> ii = std::static_ptr_cast<InputInfo>(mdi);
-      ii->IRange.reset(new Range(SRange->min(), SRange->max()));
+      if (std::shared_ptr<InputInfo> ii = std::dynamic_ptr_cast<InputInfo>(mdi)) {
+        ii->IRange.reset(new Range(SRange->min(), SRange->max()));
+      } else {
+        LLVM_DEBUG(dbgs() << "WARNING: mismatch between computed range type and metadata.\n");
+      }
     }
   } else if (const std::shared_ptr<VRAStructNode> structr =
              std::dynamic_ptr_cast<VRAStructNode>(r)) {
