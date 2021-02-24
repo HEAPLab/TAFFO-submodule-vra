@@ -51,6 +51,7 @@ private:
   void handleSpecialCall(const llvm::Instruction* I);
   void handleMemCpyIntrinsics(const llvm::Instruction* memcpy);
   bool isMallocLike(const llvm::Function *F) const;
+  bool isCallocLike(const llvm::Function *F) const;
   void handleMallocCall(const llvm::CallBase *CB);
   void handleReturn(const llvm::Instruction* ret);
 
