@@ -5,6 +5,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/InstrTypes.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include <Metadata.h>
 
 
@@ -24,6 +25,7 @@ CodeInterpreter::interpretFunction(llvm::Function *F,
   retrieveLoopTripCount(F);
 
   llvm::BasicBlock *EntryBlock = &F->getEntryBlock();
+  llvm::SmallPtrSet<llvm::BasicBlock *, 4U> VisitedSuccs;
   std::deque<llvm::BasicBlock *> Worklist;
   Worklist.push_back(EntryBlock);
   Scopes.back().EvalCount[EntryBlock] = 1U;
@@ -50,8 +52,17 @@ CodeInterpreter::interpretFunction(llvm::Function *F,
     --(Scopes.back().EvalCount[BB]);
 
     llvm::Instruction *Term = BB->getTerminator();
+    VisitedSuccs.clear();
     for (unsigned NS = 0; NS < Term->getNumSuccessors(); ++NS) {
       llvm::BasicBlock *Succ = Term->getSuccessor(NS);
+
+      // Needed just for terminators where the same successor appears twice
+      if (VisitedSuccs.count(Succ)) {
+        continue;
+      } else {
+        VisitedSuccs.insert(Succ);
+      }
+
       if (followEdge(BB, Succ)) {
 	Worklist.push_front(Succ);
       }

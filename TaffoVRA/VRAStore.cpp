@@ -232,7 +232,7 @@ VRAStore::storeNode(NodePtrT Dst, const NodePtrT Src,
       break;
     }
     default:
-      llvm_unreachable("Trying to store into a non-pointer node.");
+      LLVM_DEBUG(dbgs() << "WARNING: trying to store into a non-pointer node, aborted.\n");
   }
 }
 

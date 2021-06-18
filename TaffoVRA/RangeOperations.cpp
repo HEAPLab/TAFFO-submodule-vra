@@ -304,13 +304,19 @@ taffo::handleDiv(const range_ptr_t &op1, const range_ptr_t &op2) {
   if (!op1 || !op2) {
     return nullptr;
   }
+  num_t op2_min, op2_max;
   // Avoid division by 0
-  num_t op2_min = (op2->min() == 0.0 && op2->max() > 0.0)
-    ? 1.0 // std::nextafter(static_cast<num_t>(0.0), static_cast<num_t>(op2->max()))
-    : op2->min();
-  num_t op2_max = (op2->max() == 0.0 && op2->min() < 0.0)
-    ? -1.0 // std::nextafter(static_cast<num_t>(0.0), static_cast<num_t>(op2->min()))
-    : op2->max();
+#define DIV_EPS (static_cast<num_t>(1e-8))
+  if (op2->max() <= 0) {
+    op2_min = std::min(op2->min(), -DIV_EPS);
+    op2_max = std::min(op2->max(), -DIV_EPS);
+  } else if (op2->min() < 0) {
+    op2_min = -DIV_EPS;
+    op2_max = +DIV_EPS;
+  } else {
+    op2_min = std::max(op2->min(), +DIV_EPS);
+    op2_max = std::max(op2->max(), +DIV_EPS);
+  }
   num_t a = op1->min() / op2_min;
   num_t b = op1->max() / op2_max;
   num_t c = op1->min() / op2_max;
@@ -501,11 +507,15 @@ taffo::copyRange(const RangeNodePtrT op) {
   unsigned num_fields = op_s->getNumFields();
   new_fields.reserve(num_fields);
   for (unsigned i = 0; i < num_fields; ++i) {
-    if (const std::shared_ptr<VRAPtrNode> ptr_field =
-        std::dynamic_ptr_cast_or_null<VRAPtrNode>(op_s->getNodeAt(i))) {
-      new_fields.push_back(std::make_shared<VRAPtrNode>(ptr_field->getParent()));
+    if (const NodePtrT field = op_s->getNodeAt(i)) {
+      if (const std::shared_ptr<VRAPtrNode> ptr_field =
+          std::dynamic_ptr_cast_or_null<VRAPtrNode>(field)) {
+        new_fields.push_back(std::make_shared<VRAPtrNode>(ptr_field->getParent()));
+      } else {
+        new_fields.push_back(copyRange(std::static_ptr_cast<VRARangeNode>(field)));
+      }
     } else {
-      new_fields.push_back(copyRange(std::static_ptr_cast<VRARangeNode>(op_s->getNodeAt(i))));
+      new_fields.push_back(nullptr);
     }
   }
   return std::make_shared<VRAStructNode>(new_fields);

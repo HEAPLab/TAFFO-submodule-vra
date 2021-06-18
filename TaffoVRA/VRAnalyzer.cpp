@@ -296,6 +296,13 @@ VRAnalyzer::isMallocLike(const llvm::Function *F) const {
     || FName == "_Znwm" || FName == "_Znam";
 }
 
+bool
+VRAnalyzer::isCallocLike(const llvm::Function *F) const {
+  const llvm::StringRef FName = F->getName();
+  // TODO make sure this works in other platforms
+  return FName == "calloc";
+}
+
 void
 VRAnalyzer::handleMallocCall(const llvm::CallBase *CB) {
   LLVM_DEBUG(Logger->logInfo("malloc-like"));
@@ -316,9 +323,15 @@ VRAnalyzer::handleMallocCall(const llvm::CallBase *CB) {
     }
     LLVM_DEBUG(Logger->logInfoln("struct"));
   } else {
-    if (!(AllocatedType && AllocatedType->isPointerTy())
-        && InputRange && std::isa_ptr<VRAScalarNode>(InputRange)) {
-      DerivedRanges[CB] = std::make_shared<VRAPtrNode>(InputRange);
+    if (!(AllocatedType && AllocatedType->isPointerTy())) {
+      if (InputRange && std::isa_ptr<VRAScalarNode>(InputRange)) {
+        DerivedRanges[CB] = std::make_shared<VRAPtrNode>(InputRange);
+      } else if (isCallocLike(CB->getCalledFunction())) {
+        DerivedRanges[CB] =
+          std::make_shared<VRAPtrNode>(std::make_shared<VRAScalarNode>(make_range(0,0)));
+      } else {
+        DerivedRanges[CB] = std::make_shared<VRAPtrNode>();
+      }
     } else {
       DerivedRanges[CB] = std::make_shared<VRAPtrNode>();
     }
@@ -332,11 +345,7 @@ VRAnalyzer::handleReturn(const llvm::Instruction* ret) {
   LLVM_DEBUG(Logger->logInstruction(ret));
   if (const llvm::Value* ret_val = ret_i->getReturnValue()) {
     const llvm::Function* ret_fun = ret_i->getFunction();
-    NodePtrT range = fetchRangeNode(ret_val);
-    if (!range) {
-      // Maybe it is a pointer...
-      range = getNode(ret_val);
-    }
+    NodePtrT range = getNode(ret_val);
 
     std::shared_ptr<VRAFunctionStore> FStore =
       std::static_ptr_cast<VRAFunctionStore>(CodeInt.getFunctionStore());

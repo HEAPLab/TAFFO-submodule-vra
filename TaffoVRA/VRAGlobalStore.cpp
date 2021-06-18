@@ -62,6 +62,8 @@ VRAGlobalStore::harvestMetadata(Module &M) {
       NodePtrT Const = fetchConstant(&v);
       if (Const && Const->getKind() == VRANode::VRAScalarNodeK)
         DerivedRanges[&v] = std::make_shared<VRAPtrNode>(Const);
+      else if (Const && Const->getKind() == VRANode::VRAPtrNodeK)
+        DerivedRanges[&v] = Const;
       else
         DerivedRanges[&v] = std::make_shared<VRAPtrNode>();
     }
@@ -144,9 +146,11 @@ VRAGlobalStore::harvestMetadata(Module &M) {
                                  make_range(II->IRange->Min, II->IRange->Max, II->isFinal()));
           }
         } else if (StructInfo *SI = dyn_cast<StructInfo>(MDI)) {
-          const llvm::Value* i_ptr = &i;
-          UserInput[i_ptr] = std::static_ptr_cast<VRARangeNode>(
-                               harvestStructMD(SI, fullyUnwrapPointerOrArrayType(i_ptr->getType())));
+          if (!i.getType()->isVoidTy()) {
+            const llvm::Value* i_ptr = &i;
+            UserInput[i_ptr] = std::static_ptr_cast<VRARangeNode>(
+              harvestStructMD(SI, fullyUnwrapPointerOrArrayType(i_ptr->getType())));
+          }
         }
       }
     }
@@ -295,8 +299,11 @@ VRAGlobalStore::updateMDInfo(std::shared_ptr<mdutils::MDInfo> mdi,
   if (const std::shared_ptr<VRAScalarNode> Scalar =
       std::dynamic_ptr_cast<VRAScalarNode>(r)) {
     if (range_ptr_t SRange = Scalar->getRange()) {
-      std::shared_ptr<InputInfo> ii = std::static_ptr_cast<InputInfo>(mdi);
-      ii->IRange.reset(new Range(SRange->min(), SRange->max()));
+      if (std::shared_ptr<InputInfo> ii = std::dynamic_ptr_cast<InputInfo>(mdi)) {
+        ii->IRange.reset(new Range(SRange->min(), SRange->max()));
+      } else {
+        LLVM_DEBUG(dbgs() << "WARNING: mismatch between computed range type and metadata.\n");
+      }
     }
   } else if (const std::shared_ptr<VRAStructNode> structr =
              std::dynamic_ptr_cast<VRAStructNode>(r)) {
@@ -393,23 +400,19 @@ VRAGlobalStore::getNode(const llvm::Value* v) {
 
 const RangeNodePtrT
 VRAGlobalStore::fetchRangeNode(const llvm::Value* V) {
-  if (const RangeNodePtrT Derived = VRAStore::fetchRangeNode(V)) {
-    if (std::isa_ptr<VRAStructNode>(Derived)) {
-      if (RangeNodePtrT InputRange = getUserInput(V)) {
-        // fill null input_range fields with corresponding derived fields
-        return fillRangeHoles(Derived, InputRange);
-      }
-    }
-    return Derived;
-  }
+  const RangeNodePtrT Derived = VRAStore::fetchRangeNode(V);
 
   if (const RangeNodePtrT InputRange = getUserInput(V)) {
-    // Save it in this store, so we don't overwrite it if it's final.
-    saveValueRange(V, InputRange);
-    return InputRange;
+    if (Derived && std::isa_ptr<VRAStructNode>(Derived)) {
+      return fillRangeHoles(Derived, InputRange);
+    }
+    const auto ScalarInput = std::dynamic_ptr_cast<VRAScalarNode>(InputRange);
+    if (ScalarInput && ScalarInput->isFinal()) {
+      return InputRange;
+    }
   }
 
-  return nullptr;
+  return Derived;
 }
 
 RangeNodePtrT
